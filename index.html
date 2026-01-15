@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUB3 馬拉松訓練計劃 - 12週課表</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='24' cy='24' r='23' fill='%231a1a2e' stroke='%23e94560' stroke-width='2'/%3E%3Ccircle cx='24' cy='18' r='5' fill='%23e94560'/%3E%3Cpath d='M24 23 L24 32 M24 26 L18 30 M24 26 L30 30 M24 32 L20 42 M24 32 L28 42' stroke='%23e94560' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <nav class="nav">
+            <div class="nav-logos">
+                <span class="nav-race-name" id="navRaceName">SUB3 馬拉松訓練</span>
+                <span class="nav-logo-separator">×</span>
+                <span class="nav-race-name">高雄馬拉松</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#schedule">訓練計劃</a></li>
+                <li><a href="#race-day">比賽日</a></li>
+            </ul>
+            <a href="https://www.instagram.com/yehraven/" target="_blank" class="nav-profile">
+                <svg class="logo-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="24" cy="24" r="23" fill="#1a1a2e" stroke="#e94560" stroke-width="2"/>
+                    <circle cx="24" cy="18" r="5" fill="#e94560"/>
+                    <path d="M24 23 L24 32 M24 26 L18 30 M24 26 L30 30 M24 32 L20 42 M24 32 L28 42" stroke="#e94560" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </a>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <div class="countdown-container">
+                <span class="countdown-label">距離比賽還有</span>
+                <div class="countdown-timer">
+                    <div class="countdown-item">
+                        <span class="countdown-value" id="countdown-days">---</span>
+                        <span class="countdown-unit">天</span>
+                    </div>
+                    <div class="countdown-item">
+                        <span class="countdown-value" id="countdown-hours">--</span>
+                        <span class="countdown-unit">時</span>
+                    </div>
+                    <div class="countdown-item">
+                        <span class="countdown-value" id="countdown-minutes">--</span>
+                        <span class="countdown-unit">分</span>
+                    </div>
+                    <div class="countdown-item">
+                        <span class="countdown-value" id="countdown-seconds">--</span>
+                        <span class="countdown-unit">秒</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-title-row">
+                <h1 id="raceTitle">SUB3 馬拉松訓練</h1>
+                <div class="hero-date">
+                    <span class="date-label">比賽日期</span>
+                    <span class="date-value" id="raceDateDisplay">2025/01/11</span>
+                </div>
+            </div>
+            <h2>12週訓練計劃 | 高雄馬拉松</h2>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-icon">🏃</span>
+                    <span class="stat-value">42.195km</span>
+                    <span class="stat-label">全程馬拉松</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-icon">🎯</span>
+                    <span class="stat-value">SUB3</span>
+                    <span class="stat-label">目標完賽</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-icon">⏱️</span>
+                    <span class="stat-value">~4:15/km</span>
+                    <span class="stat-label">目標配速</span>
+                </div>
+            </div>
+            <div class="today-training" id="todayTraining">
+                <div class="today-training-left">
+                    <div class="today-training-header">
+                        <span class="today-label" id="todayLabel">今日訓練</span>
+                    </div>
+                    <div class="today-training-content">
+                        <div class="today-tags">
+                            <div class="today-phase" id="todayPhase"></div>
+                            <div class="today-intensity" id="todayIntensity"></div>
+                        </div>
+                        <div class="today-description" id="todayDescription"></div>
+                        <div class="today-stats">
+                            <span class="today-stat" id="todayRun"></span>
+                            <span class="today-stat" id="todayType"></span>
+                        </div>
+                    </div>
+                    <div class="today-note" id="todayNote"></div>
+                    <div class="today-motivation" id="todayMotivation"></div>
+                </div>
+                <div class="today-actions" id="todayActions"></div>
+            </div>
+        </div>
+        <div class="scroll-indicator">
+            <span>向下滾動</span>
+            <div class="scroll-arrow"></div>
+        </div>
+    </section>
+
+    <!-- Training Schedule Section -->
+    <section id="schedule" class="section schedule-section">
+        <div class="container">
+            <h2 class="section-title">週訓練量總覽</h2>
+
+            <!-- Weekly Summary with Integrated Phases -->
+            <div class="weekly-summary">
+                <div class="summary-cards">
+                    <div class="summary-card" data-phase="基礎期">
+                        <div class="card-phase-header">
+                            <span class="phase-icon">🌱</span>
+                            <div class="phase-info">
+                                <h4>基礎期</h4>
+                                <span class="phase-weeks">Week 1-4</span>
+                            </div>
+                        </div>
+                        <p class="phase-description">建立有氧基礎，循序漸進</p>
+                        <div class="card-content">
+                            <div class="card-stat"><span class="label">週跑量</span><span class="value">100-130km</span></div>
+                            <div class="card-stat"><span class="label">長距離</span><span class="value">21-35km</span></div>
+                            <div class="card-stat total"><span class="label">主要訓練</span><span class="value">速度/節奏</span></div>
+                        </div>
+                    </div>
+                    <div class="summary-card featured" data-phase="強化期">
+                        <div class="card-phase-header">
+                            <span class="phase-icon">💪</span>
+                            <div class="phase-info">
+                                <h4>強化期</h4>
+                                <span class="phase-weeks">Week 5-8</span>
+                            </div>
+                        </div>
+                        <p class="phase-description">最大訓練量，專項能力突破</p>
+                        <div class="card-content">
+                            <div class="card-stat"><span class="label">週跑量</span><span class="value">120-160km</span></div>
+                            <div class="card-stat"><span class="label">長距離</span><span class="value">32-35km</span></div>
+                            <div class="card-stat total"><span class="label">主要訓練</span><span class="value">MP配速</span></div>
+                        </div>
+                    </div>
+                    <div class="summary-card" data-phase="巔峰期">
+                        <div class="card-phase-header">
+                            <span class="phase-icon">🔥</span>
+                            <div class="phase-info">
+                                <h4>巔峰期</h4>
+                                <span class="phase-weeks">Week 9-10</span>
+                            </div>
+                        </div>
+                        <p class="phase-description">維持強度，準備巔峰表現</p>
+                        <div class="card-content">
+                            <div class="card-stat"><span class="label">週跑量</span><span class="value">105-160km</span></div>
+                            <div class="card-stat"><span class="label">長距離</span><span class="value">14-35km</span></div>
+                            <div class="card-stat total"><span class="label">主要訓練</span><span class="value">速度/節奏</span></div>
+                        </div>
+                    </div>
+                    <div class="summary-card" data-phase="減量期">
+                        <div class="card-phase-header">
+                            <span class="phase-icon">🎯</span>
+                            <div class="phase-info">
+                                <h4>減量期</h4>
+                                <span class="phase-weeks">Week 11-12</span>
+                            </div>
+                        </div>
+                        <p class="phase-description">恢復能量，迎接比賽</p>
+                        <div class="card-content">
+                            <div class="card-stat"><span class="label">週跑量</span><span class="value">56-105km</span></div>
+                            <div class="card-stat"><span class="label">長距離</span><span class="value">14km</span></div>
+                            <div class="card-stat total"><span class="label">主要訓練</span><span class="value">恢復/輕鬆</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="total-training">
+                    <div class="total-item">
+                        <span class="total-label">總訓練天數</span>
+                        <span class="total-value">84天</span>
+                    </div>
+                    <div class="total-item">
+                        <span class="total-label">總跑步量</span>
+                        <span class="total-value">~1,495km</span>
+                    </div>
+                    <div class="total-item">
+                        <span class="total-label">目標配速</span>
+                        <span class="total-value">4:15/km</span>
+                    </div>
+                    <div class="total-item">
+                        <span class="total-label">目標完賽</span>
+                        <span class="total-value">2:59:xx</span>
+                    </div>
+                </div>
+
+                <!-- Weekly Mileage Chart -->
+                <div class="weekly-chart-container">
+                    <h3>每週訓練里程趨勢</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="weeklyMileageChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Schedule -->
+            <div class="daily-schedule">
+                <h3>每日訓練計劃</h3>
+                <div class="schedule-filters">
+                    <button class="filter-btn active" data-filter="all">全部</button>
+                    <button class="filter-btn" data-filter="基礎期">基礎期</button>
+                    <button class="filter-btn" data-filter="強化期">強化期</button>
+                    <button class="filter-btn" data-filter="巔峰期">巔峰期</button>
+                    <button class="filter-btn" data-filter="減量期">減量期</button>
+                </div>
+                <div class="schedule-table-container">
+                    <table class="schedule-table" id="scheduleTable">
+                        <thead>
+                            <tr>
+                                <th>週次</th>
+                                <th>日期</th>
+                                <th>星期</th>
+                                <th>類型</th>
+                                <th>訓練內容</th>
+                                <th>強度</th>
+                                <th>距離</th>
+                                <th>週跑量</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scheduleBody">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Race Day Section -->
+    <section id="race-day" class="section race-day-section">
+        <div class="container">
+            <h2 class="section-title">比賽日策略</h2>
+            <div class="race-day-content">
+                <div class="race-info-card">
+                    <h3>🏁 2025 高雄馬拉松</h3>
+                    <div class="race-details">
+                        <div class="detail-item">
+                            <span class="detail-label">日期</span>
+                            <span class="detail-value">2025年1月11日 (週日)</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">距離</span>
+                            <span class="detail-value">42.195km 全程馬拉松</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">目標時間</span>
+                            <span class="detail-value">2:59:xx (SUB3)</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">目標配速</span>
+                            <span class="detail-value">~4:15/km</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="pace-strategy-card">
+                    <h3>📊 配速策略</h3>
+                    <div class="pace-zones">
+                        <div class="pace-zone">
+                            <span class="zone-label">0-10km</span>
+                            <span class="zone-pace">4:15-4:18/km</span>
+                            <span class="zone-note">穩定起步，不要衝太快</span>
+                        </div>
+                        <div class="pace-zone">
+                            <span class="zone-label">10-21km</span>
+                            <span class="zone-pace">4:12-4:15/km</span>
+                            <span class="zone-note">找到節奏，維持穩定</span>
+                        </div>
+                        <div class="pace-zone">
+                            <span class="zone-label">21-30km</span>
+                            <span class="zone-pace">4:12-4:15/km</span>
+                            <span class="zone-note">保持專注，準備迎接撞牆期</span>
+                        </div>
+                        <div class="pace-zone featured">
+                            <span class="zone-label">30-42km</span>
+                            <span class="zone-pace">4:10-4:15/km</span>
+                            <span class="zone-note">全力以赴，衝向終點！</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-tags">
+                    <span class="tag">#SUB3</span>
+                    <span class="tag">#馬拉松</span>
+                    <span class="tag">#高雄馬拉松</span>
+                    <span class="tag">#訓練計劃</span>
+                </div>
+                <p class="footer-copyright">© 2024 SUB3 馬拉松訓練計劃 | 12週課表</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Workout Modal -->
+    <div class="workout-modal" id="workoutModal">
+        <div class="workout-modal-content" id="workoutModalContent">
+            <!-- Content populated by JavaScript -->
+        </div>
+    </div>
+
+    <script type="module" src="modules/main.js"></script>
+</body>
+</html>
