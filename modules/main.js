@@ -1,8 +1,11 @@
 // Main entry point - Marathon Training Plan
 import { trainingData, weeklySummary, motivationQuotes, getMotivationQuote, RACE_DATE, RACE_NAME } from './trainingData.js';
+import { convertToGarminWorkout, downloadWorkoutJson } from './workoutBuilder.js';
+import { formatSecondsToPace, TRAINING_PARAMS } from './paceZones.js';
 
 // Make data available globally
 window.trainingData = trainingData;
+window.convertToGarminWorkout = convertToGarminWorkout;
 
 // ============================================
 // Countdown Timer
@@ -318,8 +321,11 @@ function setupSummaryCards() {
 }
 
 // ============================================
-// Workout Modal
+// Workout Modal with Garmin Export
 // ============================================
+
+// Store current workout data for download
+let currentWorkoutData = null;
 
 function showWorkoutModal(dayIndex) {
     const training = trainingData[dayIndex];
@@ -331,9 +337,20 @@ function showWorkoutModal(dayIndex) {
 
     const quote = getMotivationQuote(dayIndex);
 
+    // Generate Garmin workout
+    const workouts = convertToGarminWorkout(training, dayIndex);
+    currentWorkoutData = workouts.length > 0 ? workouts[0].data : null;
+
+    // Render workout steps preview
+    let stepsPreviewHtml = '';
+    if (currentWorkoutData && currentWorkoutData.workoutSegments) {
+        const steps = currentWorkoutData.workoutSegments[0]?.workoutSteps || [];
+        stepsPreviewHtml = renderStepsPreview(steps);
+    }
+
     modalContent.innerHTML = `
         <div class="modal-header">
-            <h3>訓練詳情</h3>
+            <h3>Garmin 訓練計劃</h3>
             <button class="modal-close" onclick="closeWorkoutModal()">&times;</button>
         </div>
         <div class="modal-body">
@@ -350,11 +367,24 @@ function showWorkoutModal(dayIndex) {
                 <strong>訓練內容：</strong><br>
                 ${training.content.replace(/\n/g, '<br>')}
             </div>
-            <div style="margin-bottom: 15px;">
-                <strong>距離：</strong> ${training.distance}km
+            <div style="display: flex; gap: 20px; margin-bottom: 15px;">
+                <div><strong>距離：</strong> ${training.distance}km</div>
+                <div><strong>預估時間：</strong> ${currentWorkoutData ? Math.round(currentWorkoutData.estimatedDurationInSecs / 60) : '-'} 分鐘</div>
             </div>
             ${training.race ? `<div style="background: #fff3e0; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px;"><strong>🏁 比賽：</strong> ${training.race}</div>` : ''}
-            ${training.note ? `<div style="color: var(--text-light); font-size: 0.9rem;"><em>備註：${training.note}</em></div>` : ''}
+            ${training.note ? `<div style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 15px;"><em>備註：${training.note}</em></div>` : ''}
+
+            ${stepsPreviewHtml}
+
+            ${currentWorkoutData ? `
+            <div style="margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+                <h4 style="margin-bottom: 10px;">📥 匯出 Garmin 訓練</h4>
+                <p style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 15px;">下載 JSON 檔案後，可匯入 Garmin Connect 使用</p>
+                <button class="btn-download-workout" onclick="downloadCurrentWorkout(${dayIndex})">
+                    下載 Garmin Workout JSON
+                </button>
+            </div>
+            ` : ''}
         </div>
         <div class="modal-footer">
             <button class="btn-close" onclick="closeWorkoutModal()">關閉</button>
@@ -365,6 +395,126 @@ function showWorkoutModal(dayIndex) {
     document.body.style.overflow = 'hidden';
 }
 
+// Render workout steps preview
+function renderStepsPreview(steps) {
+    if (!steps || steps.length === 0) return '';
+
+    let html = `<div class="steps-preview">
+        <div class="steps-header">訓練步驟</div>`;
+
+    steps.forEach(step => {
+        html += renderStep(step);
+    });
+
+    html += '</div>';
+    return html;
+}
+
+function renderStep(step) {
+    const stepType = step.stepType?.stepTypeKey || 'interval';
+
+    // Handle repeat groups
+    if (stepType === 'repeat' && step.workoutSteps) {
+        return renderRepeatGroup(step);
+    }
+
+    const label = getStepLabel(stepType);
+    const duration = formatStepDuration(step);
+    const target = formatStepTarget(step);
+
+    return `
+        <div class="step-item step-type-${stepType}">
+            <div class="step-color-bar ${stepType}"></div>
+            <div class="step-content">
+                <div class="step-label">${label}</div>
+                <div class="step-duration">${duration}</div>
+                ${target ? `<div class="step-target">${target}</div>` : ''}
+                ${step.description ? `<div class="step-description">${step.description}</div>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function renderRepeatGroup(step) {
+    const reps = step.numberOfIterations || 1;
+    const childSteps = step.workoutSteps || [];
+
+    let html = `
+        <div class="step-repeat-group">
+            <div class="repeat-header">
+                <span class="repeat-times">${reps}x</span>
+                <span>重複訓練</span>
+            </div>
+            <div class="repeat-steps">
+    `;
+    childSteps.forEach(childStep => {
+        html += renderStep(childStep);
+    });
+    html += '</div></div>';
+    return html;
+}
+
+function getStepLabel(stepType) {
+    const labels = {
+        'warmup': '熱身',
+        'cooldown': '緩和',
+        'interval': '主課表',
+        'rest': '休息',
+        'recovery': '恢復',
+        'active': '動態恢復'
+    };
+    return labels[stepType] || stepType;
+}
+
+function formatStepDuration(step) {
+    const condition = step.endCondition?.conditionTypeKey;
+    const value = step.endConditionValue;
+
+    if (!condition || !value) return '';
+
+    if (condition === 'distance') {
+        return value >= 1000 ? `${(value / 1000).toFixed(1)} km` : `${value} m`;
+    } else if (condition === 'time') {
+        if (value >= 60) {
+            const mins = Math.floor(value / 60);
+            const secs = value % 60;
+            return secs > 0 ? `${mins}分${secs}秒` : `${mins} 分鐘`;
+        }
+        return `${value} 秒`;
+    }
+    return '';
+}
+
+function formatStepTarget(step) {
+    if (!step.targetType || step.targetType.workoutTargetTypeKey === 'no.target') {
+        return '';
+    }
+
+    if (step.targetType.workoutTargetTypeKey === 'pace.zone') {
+        // Convert speed (m/s) back to pace (min/km)
+        const slowSpeed = step.targetValueOne;
+        const fastSpeed = step.targetValueTwo;
+        if (slowSpeed && fastSpeed) {
+            const slowPace = formatSecondsToPace(1000 / slowSpeed);
+            const fastPace = formatSecondsToPace(1000 / fastSpeed);
+            return `配速: ${fastPace} - ${slowPace} /km`;
+        }
+    }
+
+    return '';
+}
+
+// Download current workout
+function downloadCurrentWorkout(dayIndex) {
+    if (!currentWorkoutData) return;
+
+    const training = trainingData[dayIndex];
+    const filename = `${training.week}_${training.day}_${training.type.replace(/\s+/g, '_')}`;
+
+    downloadWorkoutJson(currentWorkoutData, filename);
+}
+
+window.downloadCurrentWorkout = downloadCurrentWorkout;
 window.showWorkoutModal = showWorkoutModal;
 
 function closeWorkoutModal() {
