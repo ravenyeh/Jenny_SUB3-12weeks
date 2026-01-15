@@ -56,6 +56,12 @@ function saveUserSettings() {
         // Restart countdown with new date
         updateCountdown();
 
+        // Refresh schedule table with new dates
+        populateSchedule();
+
+        // Refresh today's training display
+        displayTodayTraining();
+
         // Hide panel
         toggleSettingsPanel();
 
@@ -177,8 +183,32 @@ function updateCountdown() {
 }
 
 // ============================================
-// Date Formatting
+// Date Calculation & Formatting
 // ============================================
+
+// Calculate training date based on race date and day index
+// Training plan has 84 days (12 weeks), race day is the last day (index 83)
+function getTrainingDate(dayIndex) {
+    const raceDate = new Date(getRaceDate());
+    const totalDays = trainingData.length; // 84 days
+    const daysBeforeRace = totalDays - 1 - dayIndex;
+    const trainingDate = new Date(raceDate);
+    trainingDate.setDate(raceDate.getDate() - daysBeforeRace);
+    return trainingDate;
+}
+
+// Format date object to string for display
+function formatDateFromObj(date) {
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    const weekday = weekdays[date.getDay()];
+    return `${month}/${day} (${weekday})`;
+}
+
+function formatDateShortFromObj(date) {
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+}
 
 function formatDate(dateStr) {
     const date = new Date(dateStr);
@@ -202,12 +232,16 @@ function displayTodayTraining() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Find today's training
-    const todayTraining = trainingData.find(item => {
-        const itemDate = new Date(item.date);
-        itemDate.setHours(0, 0, 0, 0);
-        return itemDate.getTime() === today.getTime();
-    });
+    // Find today's training using dynamic dates
+    let todayTrainingIndex = -1;
+    for (let i = 0; i < trainingData.length; i++) {
+        const trainingDate = getTrainingDate(i);
+        trainingDate.setHours(0, 0, 0, 0);
+        if (trainingDate.getTime() === today.getTime()) {
+            todayTrainingIndex = i;
+            break;
+        }
+    }
 
     const todayTrainingDiv = document.getElementById('todayTraining');
     const todayLabel = document.getElementById('todayLabel');
@@ -220,26 +254,28 @@ function displayTodayTraining() {
 
     if (!todayTrainingDiv) return;
 
-    if (todayTraining) {
-        const dayIndex = trainingData.indexOf(todayTraining);
+    if (todayTrainingIndex >= 0) {
+        const todayTraining = trainingData[todayTrainingIndex];
         todayLabel.textContent = '今日訓練';
         todayPhase.textContent = todayTraining.phase;
         todayIntensity.textContent = todayTraining.intensity;
         todayDescription.innerHTML = todayTraining.content.replace(/\n/g, '<br>');
         todayRun.textContent = `🏃 ${todayTraining.distance}km`;
         todayType.textContent = todayTraining.type;
-        todayMotivation.textContent = `💪 ${getMotivationQuote(dayIndex)}`;
+        todayMotivation.textContent = `💪 ${getMotivationQuote(todayTrainingIndex)}`;
         todayTrainingDiv.style.display = 'block';
     } else {
         // Check if we're before training starts or after race
-        const firstDate = new Date(trainingData[0].date);
-        const lastDate = new Date(trainingData[trainingData.length - 1].date);
+        const firstDate = getTrainingDate(0);
+        firstDate.setHours(0, 0, 0, 0);
+        const lastDate = getTrainingDate(trainingData.length - 1);
+        lastDate.setHours(0, 0, 0, 0);
 
         if (today < firstDate) {
             todayLabel.textContent = '訓練即將開始';
             todayPhase.textContent = '準備期';
             todayIntensity.textContent = '';
-            todayDescription.textContent = `訓練將於 ${formatDate(trainingData[0].date)} 開始`;
+            todayDescription.textContent = `訓練將於 ${formatDateFromObj(firstDate)} 開始`;
             todayRun.textContent = '';
             todayType.textContent = '';
             todayMotivation.textContent = '💪 做好準備，迎接挑戰！';
@@ -253,21 +289,26 @@ function displayTodayTraining() {
             todayMotivation.textContent = '🏆 你做到了！';
         } else {
             // Find next training day
-            const nextTraining = trainingData.find(item => {
-                const itemDate = new Date(item.date);
-                itemDate.setHours(0, 0, 0, 0);
-                return itemDate > today;
-            });
+            let nextTrainingIndex = -1;
+            for (let i = 0; i < trainingData.length; i++) {
+                const trainingDate = getTrainingDate(i);
+                trainingDate.setHours(0, 0, 0, 0);
+                if (trainingDate > today) {
+                    nextTrainingIndex = i;
+                    break;
+                }
+            }
 
-            if (nextTraining) {
-                const dayIndex = trainingData.indexOf(nextTraining);
+            if (nextTrainingIndex >= 0) {
+                const nextTraining = trainingData[nextTrainingIndex];
+                const nextDate = getTrainingDate(nextTrainingIndex);
                 todayLabel.textContent = '下次訓練';
                 todayPhase.textContent = nextTraining.phase;
                 todayIntensity.textContent = nextTraining.intensity;
-                todayDescription.innerHTML = `${formatDate(nextTraining.date)}<br>${nextTraining.content.replace(/\n/g, '<br>')}`;
+                todayDescription.innerHTML = `${formatDateFromObj(nextDate)}<br>${nextTraining.content.replace(/\n/g, '<br>')}`;
                 todayRun.textContent = `🏃 ${nextTraining.distance}km`;
                 todayType.textContent = nextTraining.type;
-                todayMotivation.textContent = `💪 ${getMotivationQuote(dayIndex)}`;
+                todayMotivation.textContent = `💪 ${getMotivationQuote(nextTrainingIndex)}`;
             }
         }
         todayTrainingDiv.style.display = 'block';
@@ -300,14 +341,20 @@ function populateSchedule(filter = 'all') {
     if (!tbody) return;
     tbody.innerHTML = '';
 
+    // Create array with original indices for date calculation
+    const dataWithIndices = trainingData.map((item, idx) => ({ ...item, originalIndex: idx }));
+
     const filteredData = filter === 'all'
-        ? trainingData
-        : trainingData.filter(item => item.phase === filter);
+        ? dataWithIndices
+        : dataWithIndices.filter(item => item.phase === filter);
 
     let currentWeek = '';
 
-    filteredData.forEach((item, index) => {
+    filteredData.forEach((item) => {
         const row = document.createElement('tr');
+
+        // Calculate dynamic date based on race date
+        const trainingDate = getTrainingDate(item.originalIndex);
 
         // Add special classes
         if (item.type === 'Race 比賽' || item.type === 'Race Day') {
@@ -327,7 +374,7 @@ function populateSchedule(filter = 'all') {
 
         row.innerHTML = `
             <td>${showWeek ? item.week : ''}</td>
-            <td>${formatDateShort(item.date)}</td>
+            <td>${formatDateShortFromObj(trainingDate)}</td>
             <td>${item.day}</td>
             <td><span class="type-badge ${getTypeBadgeClass(item.type)}">${item.type}</span></td>
             <td class="content-cell">${item.content.replace(/\n/g, '<br>')}</td>
@@ -489,6 +536,9 @@ function showWorkoutModal(dayIndex) {
         stepsPreviewHtml = renderStepsPreview(steps);
     }
 
+    // Get dynamic training date
+    const trainingDate = getTrainingDate(dayIndex);
+
     modalContent.innerHTML = `
         <div class="modal-header">
             <h3>Garmin 訓練計劃</h3>
@@ -496,7 +546,7 @@ function showWorkoutModal(dayIndex) {
         </div>
         <div class="modal-body">
             <div class="training-info" style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                <div class="training-date" style="font-weight: 700;">${formatDate(training.date)}</div>
+                <div class="training-date" style="font-weight: 700;">${formatDateFromObj(trainingDate)}</div>
                 <span class="phase-badge phase-${training.phase}">${training.phase}</span>
                 <span class="intensity-badge intensity-${training.intensity}">${training.intensity}</span>
             </div>
