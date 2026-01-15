@@ -1,11 +1,69 @@
 // Main entry point - Marathon Training Plan
 import { trainingData, weeklySummary, motivationQuotes, getMotivationQuote, RACE_DATE, RACE_NAME } from './trainingData.js';
 import { convertToGarminWorkout, downloadWorkoutJson } from './workoutBuilder.js';
-import { formatSecondsToPace, TRAINING_PARAMS } from './paceZones.js';
+import { formatSecondsToPace, TRAINING_PARAMS, GOAL_PRESETS, refreshTrainingParams } from './paceZones.js';
 
 // Make data available globally
 window.trainingData = trainingData;
 window.convertToGarminWorkout = convertToGarminWorkout;
+
+// ============================================
+// User Settings Management
+// ============================================
+
+function toggleSettingsPanel() {
+    const panel = document.getElementById('settingsPanel');
+    if (panel) {
+        const isHidden = panel.style.display === 'none';
+        panel.style.display = isHidden ? 'block' : 'none';
+
+        // If showing panel, set the current value
+        if (isHidden) {
+            const goalSelect = document.getElementById('goalSelect');
+            const currentGoal = localStorage.getItem('userGoal') || 'sub3';
+            if (goalSelect) {
+                goalSelect.value = currentGoal;
+            }
+        }
+    }
+}
+
+function saveUserSettings() {
+    const goalSelect = document.getElementById('goalSelect');
+    if (goalSelect) {
+        const selectedGoal = goalSelect.value;
+        localStorage.setItem('userGoal', selectedGoal);
+
+        // Refresh training params
+        const newParams = refreshTrainingParams();
+
+        // Update display
+        updateSettingsDisplay();
+
+        // Hide panel
+        toggleSettingsPanel();
+
+        // Show confirmation
+        alert(`設定已儲存！\n目標：${GOAL_PRESETS[selectedGoal].name}\n配速：${GOAL_PRESETS[selectedGoal].paceStr}/km`);
+    }
+}
+
+function updateSettingsDisplay() {
+    const params = TRAINING_PARAMS;
+    const displayGoal = document.getElementById('displayGoal');
+    const displayPace = document.getElementById('displayPace');
+
+    if (displayGoal) {
+        displayGoal.textContent = params.GOAL_NAME;
+    }
+    if (displayPace) {
+        displayPace.textContent = params.MARATHON_PACE_STR;
+    }
+}
+
+// Make settings functions globally available
+window.toggleSettingsPanel = toggleSettingsPanel;
+window.saveUserSettings = saveUserSettings;
 
 // ============================================
 // Countdown Timer
@@ -547,6 +605,9 @@ document.addEventListener('keydown', (e) => {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Update settings display from localStorage
+    updateSettingsDisplay();
+
     // Start countdown
     updateCountdown();
     setInterval(updateCountdown, 1000);

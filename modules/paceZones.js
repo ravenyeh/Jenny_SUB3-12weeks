@@ -2,6 +2,14 @@
 // Running Pace Zone Calculator
 // ===========================================
 
+// Goal presets with pace per km in seconds
+export const GOAL_PRESETS = {
+    sub3: { name: 'SUB3', time: '2:59:59', paceSeconds: 255, paceStr: '4:15' },
+    sub315: { name: 'SUB 3:15', time: '3:14:59', paceSeconds: 277, paceStr: '4:37' },
+    sub330: { name: 'SUB 3:30', time: '3:29:59', paceSeconds: 298, paceStr: '4:58' },
+    sub4: { name: 'SUB4', time: '3:59:59', paceSeconds: 341, paceStr: '5:41' }
+};
+
 // Helper to parse pace string "M:SS" to seconds
 export function parsePaceToSeconds(paceStr) {
     if (!paceStr) return null;
@@ -19,16 +27,25 @@ export function formatSecondsToPace(seconds) {
 
 // Get training params from localStorage or use defaults
 export function getTrainingParams() {
-    const storedMarathonPace = localStorage.getItem('userMarathonPace');
+    const storedGoal = localStorage.getItem('userGoal') || 'sub3';
+    const preset = GOAL_PRESETS[storedGoal] || GOAL_PRESETS.sub3;
 
     return {
-        // Default: 4:15/km for SUB3 marathon
-        MARATHON_PACE_SEC: storedMarathonPace ? parsePaceToSeconds(storedMarathonPace) : 255
+        GOAL: storedGoal,
+        GOAL_NAME: preset.name,
+        MARATHON_PACE_SEC: preset.paceSeconds,
+        MARATHON_PACE_STR: preset.paceStr
     };
 }
 
 // Dynamic TRAINING_PARAMS that reads from localStorage
-export const TRAINING_PARAMS = getTrainingParams();
+export let TRAINING_PARAMS = getTrainingParams();
+
+// Refresh training params (call after settings change)
+export function refreshTrainingParams() {
+    TRAINING_PARAMS = getTrainingParams();
+    return TRAINING_PARAMS;
+}
 
 // Run Pace Zones (based on Marathon Pace)
 // These multipliers adjust the pace relative to marathon pace

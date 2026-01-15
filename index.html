@@ -115,6 +115,42 @@
     <!-- Training Schedule Section -->
     <section id="schedule" class="section schedule-section">
         <div class="container">
+            <!-- User Settings Banner -->
+            <div class="settings-summary-banner" id="settingsSummaryBanner">
+                <div class="summary-content">
+                    <span class="summary-label">🎯 目標設定：</span>
+                    <div class="summary-values" id="summaryValues">
+                        <span class="value-item"><strong id="displayGoal">SUB3</strong></span>
+                        <span class="value-item">馬拉松配速: <strong id="displayPace">4:15</strong>/km</span>
+                    </div>
+                </div>
+                <button class="btn-edit-settings" onclick="toggleSettingsPanel()">修改設定</button>
+            </div>
+
+            <!-- User Settings Panel -->
+            <div class="user-settings-panel" id="settingsPanel" style="display: none;">
+                <h3 class="settings-title">個人化訓練設定</h3>
+                <p class="settings-desc">選擇您的目標完賽時間，課表配速將自動調整</p>
+                <div class="settings-grid">
+                    <div class="setting-item">
+                        <label>🏃 目標完賽時間</label>
+                        <div class="input-group">
+                            <select id="goalSelect" class="goal-select">
+                                <option value="sub3" data-pace="255">SUB3 (2:59:59) - 4:15/km</option>
+                                <option value="sub315" data-pace="277">SUB 3:15 (3:14:59) - 4:37/km</option>
+                                <option value="sub330" data-pace="298">SUB 3:30 (3:29:59) - 4:58/km</option>
+                                <option value="sub4" data-pace="341">SUB4 (3:59:59) - 5:41/km</option>
+                            </select>
+                        </div>
+                        <span class="setting-hint">訓練配速區間會根據目標自動計算</span>
+                    </div>
+                </div>
+                <div class="settings-actions">
+                    <button class="btn-save-settings" onclick="saveUserSettings()">儲存設定</button>
+                    <button class="btn-cancel-settings" onclick="toggleSettingsPanel()">取消</button>
+                </div>
+            </div>
+
             <h2 class="section-title">週訓練量總覽</h2>
 
             <!-- Weekly Summary with Integrated Phases -->
