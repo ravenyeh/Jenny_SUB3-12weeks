@@ -71,7 +71,7 @@ export const motivationQuotes = [
     "訓練的意義在於突破！",
     "你已經比昨天更強了！",
     "SUB3，我來了！",
-    "高雄馬拉松，等著我！",
+    "目標馬拉松，等著我！",
     "42.195公里，我準備好了！",
     "每一公里都是勝利！",
     "配速穩定，心態穩定！",
@@ -92,8 +92,15 @@ export function getMotivationQuote(dayIndex) {
 }
 
 // Race date configuration
-export const RACE_DATE = '2025-01-11';
-export const RACE_NAME = '高雄馬拉松';
+export const DEFAULT_RACE_DATE = '2025-01-11';
+
+// Get race date from localStorage or use default
+export function getRaceDate() {
+    return localStorage.getItem('userRaceDate') || DEFAULT_RACE_DATE;
+}
+
+// For backward compatibility
+export const RACE_DATE = DEFAULT_RACE_DATE;
 
 // Training Schedule Data - 12 Weeks Plan (October 20, 2024 - January 11, 2025)
 export const trainingData = [

@@ -1,5 +1,5 @@
 // Main entry point - Marathon Training Plan
-import { trainingData, weeklySummary, motivationQuotes, getMotivationQuote, RACE_DATE, RACE_NAME } from './trainingData.js';
+import { trainingData, weeklySummary, motivationQuotes, getMotivationQuote, getRaceDate, DEFAULT_RACE_DATE } from './trainingData.js';
 import { convertToGarminWorkout, downloadWorkoutJson } from './workoutBuilder.js';
 import { formatSecondsToPace, TRAINING_PARAMS, GOAL_PRESETS, refreshTrainingParams } from './paceZones.js';
 
@@ -17,12 +17,18 @@ function toggleSettingsPanel() {
         const isHidden = panel.style.display === 'none';
         panel.style.display = isHidden ? 'block' : 'none';
 
-        // If showing panel, set the current value
+        // If showing panel, set the current values
         if (isHidden) {
             const goalSelect = document.getElementById('goalSelect');
             const currentGoal = localStorage.getItem('userGoal') || 'sub3';
             if (goalSelect) {
                 goalSelect.value = currentGoal;
+            }
+
+            const raceDateInput = document.getElementById('raceDateInput');
+            const currentRaceDate = getRaceDate();
+            if (raceDateInput) {
+                raceDateInput.value = currentRaceDate;
             }
         }
     }
@@ -30,9 +36,16 @@ function toggleSettingsPanel() {
 
 function saveUserSettings() {
     const goalSelect = document.getElementById('goalSelect');
+    const raceDateInput = document.getElementById('raceDateInput');
+
     if (goalSelect) {
         const selectedGoal = goalSelect.value;
         localStorage.setItem('userGoal', selectedGoal);
+
+        // Save race date
+        if (raceDateInput && raceDateInput.value) {
+            localStorage.setItem('userRaceDate', raceDateInput.value);
+        }
 
         // Refresh training params
         const newParams = refreshTrainingParams();
@@ -40,24 +53,93 @@ function saveUserSettings() {
         // Update display
         updateSettingsDisplay();
 
+        // Restart countdown with new date
+        updateCountdown();
+
         // Hide panel
         toggleSettingsPanel();
 
         // Show confirmation
-        alert(`設定已儲存！\n目標：${GOAL_PRESETS[selectedGoal].name}\n配速：${GOAL_PRESETS[selectedGoal].paceStr}/km`);
+        const raceDate = getRaceDate();
+        const formattedDate = formatRaceDateDisplay(raceDate);
+        alert(`設定已儲存！\n目標：${GOAL_PRESETS[selectedGoal].name}\n配速：${GOAL_PRESETS[selectedGoal].paceStr}/km\n比賽日期：${formattedDate}`);
     }
+}
+
+// Format race date for display (YYYY-MM-DD -> YYYY/MM/DD)
+function formatRaceDateDisplay(dateStr) {
+    const date = new Date(dateStr);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    return `${year}/${month.toString().padStart(2, '0')}/${day.toString().padStart(2, '0')}`;
+}
+
+// Format race date with weekday (YYYY年M月D日 (週X))
+function formatRaceDateFull(dateStr) {
+    const date = new Date(dateStr);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    const weekday = weekdays[date.getDay()];
+    return `${year}年${month}月${day}日 (週${weekday})`;
 }
 
 function updateSettingsDisplay() {
     const params = TRAINING_PARAMS;
+    const raceDate = getRaceDate();
+
+    // Update goal display
     const displayGoal = document.getElementById('displayGoal');
     const displayPace = document.getElementById('displayPace');
+    const displayRaceDate = document.getElementById('displayRaceDate');
 
     if (displayGoal) {
         displayGoal.textContent = params.GOAL_NAME;
     }
     if (displayPace) {
         displayPace.textContent = params.MARATHON_PACE_STR;
+    }
+    if (displayRaceDate) {
+        displayRaceDate.textContent = formatRaceDateDisplay(raceDate);
+    }
+
+    // Update hero section
+    const raceTitle = document.getElementById('raceTitle');
+    const raceDateDisplay = document.getElementById('raceDateDisplay');
+    if (raceTitle) {
+        raceTitle.textContent = `${params.GOAL_NAME} 馬拉松訓練`;
+    }
+    if (raceDateDisplay) {
+        raceDateDisplay.textContent = formatRaceDateDisplay(raceDate);
+    }
+
+    // Update hero stats
+    const heroStats = document.querySelectorAll('.hero-stats .stat');
+    if (heroStats.length >= 3) {
+        heroStats[1].querySelector('.stat-value').textContent = params.GOAL_NAME;
+        heroStats[2].querySelector('.stat-value').textContent = `~${params.MARATHON_PACE_STR}/km`;
+    }
+
+    // Update race day section
+    const raceInfoTitle = document.getElementById('raceInfoTitle');
+    const raceDetailDate = document.getElementById('raceDetailDate');
+    const raceDetailGoal = document.getElementById('raceDetailGoal');
+    const raceDetailPace = document.getElementById('raceDetailPace');
+
+    if (raceInfoTitle) {
+        raceInfoTitle.textContent = `🏁 馬拉松比賽`;
+    }
+    if (raceDetailDate) {
+        raceDetailDate.textContent = formatRaceDateFull(raceDate);
+    }
+    if (raceDetailGoal) {
+        const goalPreset = GOAL_PRESETS[localStorage.getItem('userGoal') || 'sub3'];
+        raceDetailGoal.textContent = `${goalPreset.time.slice(0, -3)}:xx (${params.GOAL_NAME})`;
+    }
+    if (raceDetailPace) {
+        raceDetailPace.textContent = `~${params.MARATHON_PACE_STR}/km`;
     }
 }
 
@@ -70,7 +152,8 @@ window.saveUserSettings = saveUserSettings;
 // ============================================
 
 function updateCountdown() {
-    const raceDate = new Date(RACE_DATE + 'T06:00:00');
+    const raceDateStr = getRaceDate();
+    const raceDate = new Date(raceDateStr + 'T06:00:00');
     const now = new Date();
     const diff = raceDate - now;
 

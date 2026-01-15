@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SUB3 馬拉松訓練計劃 - 12週課表</title>
+    <title>馬拉松訓練計劃 - 12週課表</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='24' cy='24' r='23' fill='%231a1a2e' stroke='%23e94560' stroke-width='2'/%3E%3Ccircle cx='24' cy='18' r='5' fill='%23e94560'/%3E%3Cpath d='M24 23 L24 32 M24 26 L18 30 M24 26 L30 30 M24 32 L20 42 M24 32 L28 42' stroke='%23e94560' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,9 +16,9 @@
     <header class="header">
         <nav class="nav">
             <div class="nav-logos">
-                <span class="nav-race-name" id="navRaceName">SUB3 馬拉松訓練</span>
+                <span class="nav-race-name" id="navRaceName">馬拉松訓練計劃</span>
                 <span class="nav-logo-separator">×</span>
-                <span class="nav-race-name">高雄馬拉松</span>
+                <span class="nav-race-name">12週課表</span>
             </div>
             <ul class="nav-links">
                 <li><a href="#schedule">訓練計劃</a></li>
@@ -66,7 +66,7 @@
                     <span class="date-value" id="raceDateDisplay">2025/01/11</span>
                 </div>
             </div>
-            <h2>12週訓練計劃 | 高雄馬拉松</h2>
+            <h2>12週訓練計劃</h2>
             <div class="hero-stats">
                 <div class="stat">
                     <span class="stat-icon">🏃</span>
@@ -121,7 +121,8 @@
                     <span class="summary-label">🎯 目標設定：</span>
                     <div class="summary-values" id="summaryValues">
                         <span class="value-item"><strong id="displayGoal">SUB3</strong></span>
-                        <span class="value-item">馬拉松配速: <strong id="displayPace">4:15</strong>/km</span>
+                        <span class="value-item">配速: <strong id="displayPace">4:15</strong>/km</span>
+                        <span class="value-item">比賽: <strong id="displayRaceDate">2025/01/11</strong></span>
                     </div>
                 </div>
                 <button class="btn-edit-settings" onclick="toggleSettingsPanel()">修改設定</button>
@@ -143,6 +144,13 @@
                             </select>
                         </div>
                         <span class="setting-hint">訓練配速區間會根據目標自動計算</span>
+                    </div>
+                    <div class="setting-item">
+                        <label>📅 比賽日期</label>
+                        <div class="input-group">
+                            <input type="date" id="raceDateInput" class="race-date-input">
+                        </div>
+                        <span class="setting-hint">設定您的目標比賽日期，倒數計時將自動更新</span>
                     </div>
                 </div>
                 <div class="settings-actions">
@@ -284,11 +292,11 @@
             <h2 class="section-title">比賽日策略</h2>
             <div class="race-day-content">
                 <div class="race-info-card">
-                    <h3>🏁 2025 高雄馬拉松</h3>
+                    <h3 id="raceInfoTitle">🏁 馬拉松比賽</h3>
                     <div class="race-details">
                         <div class="detail-item">
                             <span class="detail-label">日期</span>
-                            <span class="detail-value">2025年1月11日 (週日)</span>
+                            <span class="detail-value" id="raceDetailDate">2025年1月11日 (週日)</span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">距離</span>
@@ -296,11 +304,11 @@
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">目標時間</span>
-                            <span class="detail-value">2:59:xx (SUB3)</span>
+                            <span class="detail-value" id="raceDetailGoal">2:59:xx (SUB3)</span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">目標配速</span>
-                            <span class="detail-value">~4:15/km</span>
+                            <span class="detail-value" id="raceDetailPace">~4:15/km</span>
                         </div>
                     </div>
                 </div>
@@ -340,7 +348,6 @@
                 <div class="footer-tags">
                     <span class="tag">#SUB3</span>
                     <span class="tag">#馬拉松</span>
-                    <span class="tag">#高雄馬拉松</span>
                     <span class="tag">#訓練計劃</span>
                 </div>
                 <p class="footer-copyright">© 2024 SUB3 馬拉松訓練計劃 | 12週課表</p>
