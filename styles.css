@@ -223,6 +223,50 @@ body {
     text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 }
 
+.source-credit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    max-width: 400px;
+}
+
+.source-credit a {
+    text-decoration: none;
+}
+
+.source-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.source-image:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 25px rgba(233, 69, 96, 0.3);
+}
+
+.source-text {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.source-text a {
+    color: var(--primary-color);
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.source-text a:hover {
+    color: #ff6b8a;
+}
+
 .hero-content h2 {
     font-size: 1.4rem;
     font-weight: 300;
@@ -980,23 +1024,6 @@ body {
     background: rgba(255, 255, 255, 0.1);
     border-radius: 20px;
     font-size: 0.85rem;
-}
-
-.footer-source {
-    font-size: 0.9rem;
-    margin-bottom: 10px;
-}
-
-.footer-source a {
-    color: var(--white);
-    text-decoration: none;
-    font-weight: 600;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-    transition: border-color 0.3s ease;
-}
-
-.footer-source a:hover {
-    border-color: var(--white);
 }
 
 .footer-copyright {
