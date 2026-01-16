@@ -218,6 +218,51 @@ export function parseTempoFromContent(content) {
         };
     }
 
+    // Parse pyramid float workout
+    // e.g., "1-2-3-2-1 float 1km @ 4:00-3:50/km"
+    const pyramidMatch = content.match(/(\d+(?:-\d+)+)\s*float\s*(\d+)\s*km\s*@\s*(\d+):(\d+)(?:-(\d+):(\d+))?\/km/i);
+    if (pyramidMatch) {
+        const pyramidStr = pyramidMatch[1]; // "1-2-3-2-1"
+        const floatKm = parseInt(pyramidMatch[2]);
+        const paceMinHigh = parseInt(pyramidMatch[3]);
+        const paceSecHigh = parseInt(pyramidMatch[4]);
+        const paceMinLow = pyramidMatch[5] ? parseInt(pyramidMatch[5]) : paceMinHigh;
+        const paceSecLow = pyramidMatch[6] ? parseInt(pyramidMatch[6]) : paceSecHigh;
+
+        const pyramidSegments = pyramidStr.split('-').map(n => parseInt(n));
+        const paceSecondsHigh = paceMinHigh * 60 + paceSecHigh;
+        const paceSecondsLow = paceMinLow * 60 + paceSecLow;
+
+        return {
+            warmupDistance: warmupKm * 1000,
+            cooldownDistance: cooldownKm * 1000,
+            pyramidSegments, // [1, 2, 3, 2, 1]
+            floatDistance: floatKm * 1000,
+            paceSecondsHigh,
+            paceSecondsLow,
+            target: getRunPaceFromSeconds(paceSecondsLow), // use faster pace as target
+            isPyramid: true
+        };
+    }
+
+    return null;
+}
+
+// Parse easy + tempo finish workout
+// e.g., "18km easy + 6km @ 4:10/km"
+export function parseEasyPlusTempoFromContent(content) {
+    const match = content.match(/(\d+)\s*km\s*easy\s*\+\s*(\d+)\s*km\s*@\s*(\d+):(\d+)\/km/i);
+    if (match) {
+        const easyKm = parseInt(match[1]);
+        const tempoKm = parseInt(match[2]);
+        const paceSeconds = parseInt(match[3]) * 60 + parseInt(match[4]);
+        return {
+            easyDistance: easyKm * 1000,
+            tempoDistance: tempoKm * 1000,
+            paceSeconds,
+            target: getRunPaceFromSeconds(paceSeconds)
+        };
+    }
     return null;
 }
 

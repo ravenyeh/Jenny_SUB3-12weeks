@@ -11,12 +11,26 @@ import {
     parseRunPaceFromContent,
     parseIntervalFromContent,
     parseTempoFromContent,
+    parseEasyPlusTempoFromContent,
     parseLongRunProgression,
     calculateDuration,
     formatSecondsToPace
 } from './paceZones.js';
 
 let stepIdCounter = 1;
+
+// Helper to get display name for training zones
+function getZoneDisplayName(zone) {
+    const names = {
+        'Z1': '輕鬆跑',
+        'Z2': '輕鬆跑',
+        'Z3': '有氧跑',
+        'Z4': '節奏跑',
+        'Z5': '速度跑',
+        'MP': '馬拉松配速'
+    };
+    return names[zone] || zone;
+}
 
 export function resetStepIdCounter() {
     stepIdCounter = 1;
@@ -281,7 +295,35 @@ export function generateTempoSteps(totalDistance, content) {
         description: '熱身'
     });
 
-    if (tempoData.isRepeated) {
+    if (tempoData.isPyramid) {
+        // Pyramid float workout (e.g., 1-2-3-2-1 float)
+        const segments = tempoData.pyramidSegments;
+        const paceStr = `${formatSecondsToPace(tempoData.paceSecondsHigh)}-${formatSecondsToPace(tempoData.paceSecondsLow)}/km`;
+
+        segments.forEach((km, index) => {
+            // Tempo segment
+            steps.push({
+                stepOrder: stepOrder++,
+                stepType: { stepTypeId: 3, stepTypeKey: 'interval' },
+                endCondition: { conditionTypeId: 3, conditionTypeKey: 'distance' },
+                endConditionValue: km * 1000,
+                ...tempoData.target,
+                description: `${km}km @ ${paceStr}`
+            });
+
+            // Float recovery (except after last segment)
+            if (index < segments.length - 1) {
+                steps.push({
+                    stepOrder: stepOrder++,
+                    stepType: { stepTypeId: 4, stepTypeKey: 'recovery' },
+                    endCondition: { conditionTypeId: 3, conditionTypeKey: 'distance' },
+                    endConditionValue: tempoData.floatDistance,
+                    ...getRunPaceTarget('EASY'),
+                    description: 'Float 恢復'
+                });
+            }
+        });
+    } else if (tempoData.isRepeated) {
         // Repeated tempo blocks with float recovery
         steps.push({
             stepOrder: stepOrder++,
@@ -331,6 +373,40 @@ export function generateTempoSteps(totalDistance, content) {
     return steps;
 }
 
+// Generate easy + tempo finish workout
+// e.g., "18km easy + 6km @ 4:10/km"
+export function generateEasyPlusTempoSteps(totalDistance, content) {
+    const steps = [];
+    let stepOrder = 1;
+
+    const data = parseEasyPlusTempoFromContent(content);
+    if (!data) {
+        return generateEasyRunSteps(totalDistance, content, 'Z2');
+    }
+
+    // Easy portion
+    steps.push({
+        stepOrder: stepOrder++,
+        stepType: { stepTypeId: 3, stepTypeKey: 'interval' },
+        endCondition: { conditionTypeId: 3, conditionTypeKey: 'distance' },
+        endConditionValue: data.easyDistance,
+        ...getRunPaceTarget('EASY'),
+        description: `輕鬆跑 ${data.easyDistance / 1000}km`
+    });
+
+    // Tempo finish
+    steps.push({
+        stepOrder: stepOrder++,
+        stepType: { stepTypeId: 3, stepTypeKey: 'interval' },
+        endCondition: { conditionTypeId: 3, conditionTypeKey: 'distance' },
+        endConditionValue: data.tempoDistance,
+        ...data.target,
+        description: `節奏跑 ${data.tempoDistance / 1000}km @ ${formatSecondsToPace(data.paceSeconds)}/km`
+    });
+
+    return steps;
+}
+
 // Generate long run workout
 export function generateLongRunSteps(totalDistance, content) {
     const steps = [];
@@ -339,27 +415,16 @@ export function generateLongRunSteps(totalDistance, content) {
     const progression = parseLongRunProgression(content);
 
     if (progression && progression.length > 0) {
-        // Progression long run
+        // Progression long run - all segments are 'interval' type with descriptive labels
         progression.forEach((segment, index) => {
-            const isFirst = index === 0;
-            const isLast = index === progression.length - 1;
-
-            let stepType;
-            if (isFirst) {
-                stepType = { stepTypeId: 1, stepTypeKey: 'warmup' };
-            } else if (isLast) {
-                stepType = { stepTypeId: 2, stepTypeKey: 'cooldown' };
-            } else {
-                stepType = { stepTypeId: 3, stepTypeKey: 'interval' };
-            }
-
+            const zoneName = getZoneDisplayName(segment.zone);
             steps.push({
                 stepOrder: stepOrder++,
-                stepType,
+                stepType: { stepTypeId: 3, stepTypeKey: 'interval' },
                 endCondition: { conditionTypeId: 3, conditionTypeKey: 'distance' },
                 endConditionValue: segment.distance,
                 ...segment.paceTarget,
-                description: `${segment.zone} - ${segment.distance / 1000}km`
+                description: `${zoneName} ${segment.distance / 1000}km`
             });
         });
     } else {
@@ -369,7 +434,8 @@ export function generateLongRunSteps(totalDistance, content) {
             stepType: { stepTypeId: 3, stepTypeKey: 'interval' },
             endCondition: { conditionTypeId: 3, conditionTypeKey: 'distance' },
             endConditionValue: totalDistance,
-            ...getRunPaceTarget('LONG_RUN')
+            ...getRunPaceTarget('LONG_RUN'),
+            description: `長距離 ${totalDistance / 1000}km`
         });
     }
 
@@ -470,8 +536,18 @@ export function convertToGarminWorkout(training, dayIndex, overrideDate = null) 
 
     let steps = [];
 
+    // Check for special content patterns first
+    const hasEasyPlusTempo = /\d+\s*km\s*easy\s*\+\s*\d+\s*km\s*@/.test(content);
+    const hasPyramidFloat = /\d+(?:-\d+)+\s*float/.test(content);
+
     // Determine workout type and generate appropriate steps
-    if (type.includes('Speed') || type.includes('速度')) {
+    if (hasEasyPlusTempo) {
+        // Easy + tempo finish workout (e.g., "18km easy + 6km @ 4:10/km")
+        steps = generateEasyPlusTempoSteps(totalDistance, content);
+    } else if (hasPyramidFloat) {
+        // Pyramid float workout (e.g., "1-2-3-2-1 float 1km @ 4:00-3:50/km")
+        steps = generateTempoSteps(totalDistance, content);
+    } else if (type.includes('Speed') || type.includes('速度')) {
         if (content.includes('hill')) {
             steps = generateHillSprintSteps(totalDistance, content);
         } else {

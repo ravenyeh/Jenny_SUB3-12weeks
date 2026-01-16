@@ -675,7 +675,8 @@ function renderStep(step) {
         return renderRepeatGroup(step);
     }
 
-    const label = getStepLabel(stepType);
+    // Use description as label if available, otherwise use generic step type label
+    const label = step.description || getStepLabel(stepType);
     const duration = formatStepDuration(step);
     const target = formatStepTarget(step);
 
@@ -686,7 +687,6 @@ function renderStep(step) {
                 <div class="step-label">${label}</div>
                 <div class="step-duration">${duration}</div>
                 ${target ? `<div class="step-target">${target}</div>` : ''}
-                ${step.description ? `<div class="step-description">${step.description}</div>` : ''}
             </div>
         </div>
     `;
