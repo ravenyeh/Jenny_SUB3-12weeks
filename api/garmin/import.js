@@ -38,15 +38,7 @@ module.exports = async (req, res) => {
             password: password
         });
 
-        try {
-            await GC.login();
-        } catch (loginError) {
-            console.error('Login error:', loginError.message);
-            return res.status(401).json({
-                success: false,
-                error: '登入失敗：請確認 Email 和密碼是否正確'
-            });
-        }
+        await GC.login();
 
         // Import each workout
         const results = [];
@@ -59,6 +51,7 @@ module.exports = async (req, res) => {
                 try {
                     createdWorkout = await GC.addWorkout(workout);
                 } catch (e) {
+                    // Try alternative method if addWorkout doesn't exist
                     console.log('addWorkout failed, trying alternative:', e.message);
 
                     if (GC.client && GC.client.post) {
@@ -72,16 +65,22 @@ module.exports = async (req, res) => {
                     }
                 }
 
-                // Schedule if date provided
+                // Schedule if date provided - use correct scheduleWorkout format
                 let scheduled = false;
                 if (scheduledDate && createdWorkout && createdWorkout.workoutId) {
                     try {
+                        console.log('Scheduling workout:', createdWorkout.workoutId, 'to date:', scheduledDate);
+
+                        // Correct format: first param is object with workoutId, second is Date object
                         if (typeof GC.scheduleWorkout === 'function') {
                             await GC.scheduleWorkout(
                                 { workoutId: createdWorkout.workoutId },
                                 new Date(scheduledDate)
                             );
                             scheduled = true;
+                            console.log('Workout scheduled successfully');
+                        } else {
+                            console.log('scheduleWorkout method not available');
                         }
                     } catch (e) {
                         console.log('Schedule failed:', e.message);
@@ -109,23 +108,37 @@ module.exports = async (req, res) => {
 
         let message = `成功匯入 ${successCount}/${workouts.length} 個訓練`;
         if (scheduledCount > 0) {
-            message += `，${scheduledCount} 個已排程到日曆`;
+            message += `，${scheduledCount} 個已排程`;
+        } else if (successCount > 0) {
+            message += '（排程功能暫不可用）';
         }
 
         // Get OAuth2 token for client-side storage
         const oauth2Token = GC.client?.oauth2Token || null;
 
-        // Get user profile
+        // Get user profile and social profile
         let user = null;
         try {
             const userProfile = await GC.getUserProfile();
+
+            // Try to fetch social profile for fullName and avatar
+            let socialProfile = null;
+            if (userProfile.displayName) {
+                try {
+                    const socialUrl = `https://connect.garmin.com/modern/proxy/userprofile-service/socialProfile/${userProfile.displayName}`;
+                    socialProfile = await GC.get(socialUrl);
+                } catch (e) {
+                    // Social profile fetch is optional, continue without it
+                }
+            }
+
             user = {
                 displayName: userProfile.displayName || email.split('@')[0],
-                fullName: userProfile.fullName || null,
-                profileImageUrl: userProfile.profileImageUrlSmall || null
+                fullName: socialProfile?.fullName || socialProfile?.userProfileFullName || userProfile.fullName || null,
+                profileImageUrl: socialProfile?.profileImageUrlSmall || userProfile.profileImageUrlSmall || null
             };
         } catch (e) {
-            user = { displayName: email.split('@')[0] };
+            // User profile fetch is optional, continue without it
         }
 
         return res.status(200).json({
@@ -135,18 +148,32 @@ module.exports = async (req, res) => {
             summary: {
                 total: workouts.length,
                 imported: successCount,
-                scheduled: scheduledCount,
-                failed: workouts.length - successCount
+                scheduled: scheduledCount
             },
             oauth2Token: oauth2Token,
             user: user
         });
 
     } catch (error) {
-        console.error('Garmin import error:', error);
-        return res.status(500).json({
+        console.error('Garmin import error:', error.message);
+
+        let errorMessage = '匯入失敗';
+
+        if (error.message) {
+            const msg = error.message.toLowerCase();
+            if (msg.includes('credentials') || msg.includes('password') || msg.includes('401')) {
+                errorMessage = 'Email 或密碼錯誤';
+            } else if (msg.includes('captcha') || msg.includes('robot')) {
+                errorMessage = 'Garmin 需要驗證碼，請使用手動匯入方式';
+            } else if (msg.includes('blocked') || msg.includes('forbidden')) {
+                errorMessage = 'Garmin 暫時封鎖此連線，請使用手動匯入';
+            }
+        }
+
+        return res.status(401).json({
             success: false,
-            error: error.message || '伺服器錯誤'
+            error: errorMessage,
+            detail: 'Garmin Connect API 失敗，建議使用「複製 JSON」或「下載 .json」功能手動匯入'
         });
     }
 };

@@ -5,9 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "vercel dev",
-    "build": "echo 'Static site - no build needed'"
+    "build": "echo 'Static site - no build required'"
   },
   "dependencies": {
-    "@gooin/garmin-connect": "^1.6.4"
+    "@gooin/garmin-connect": "1.6.6"
   }
 }
