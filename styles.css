@@ -1366,11 +1366,12 @@ body {
     margin-bottom: 0;
 }
 
-/* Download Button */
+/* Download Button - Primary Garmin Import */
 .btn-download-workout {
-    width: 100%;
-    padding: 12px 20px;
-    background: var(--primary-color);
+    flex: 1;
+    min-width: 180px;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #007acc 0%, #005a9e 100%);
     color: var(--white);
     border: none;
     border-radius: 25px;
@@ -1386,12 +1387,32 @@ body {
 }
 
 .btn-download-workout:hover {
-    background: var(--accent-color);
+    background: linear-gradient(135deg, #0088e0 0%, #007acc 100%);
     transform: scale(1.02);
+    box-shadow: 0 4px 15px rgba(0, 122, 204, 0.3);
 }
 
-.btn-download-workout::before {
-    content: '⬇️';
+/* Download Only Button - Secondary */
+.btn-download-only {
+    padding: 14px 20px;
+    background: var(--secondary-color);
+    color: var(--white);
+    border: none;
+    border-radius: 25px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-download-only:hover {
+    background: #333;
+    transform: scale(1.02);
 }
 
 /* Mobile Workout Modal */

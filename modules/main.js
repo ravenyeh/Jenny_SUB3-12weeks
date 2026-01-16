@@ -588,11 +588,17 @@ function showWorkoutModal(dayIndex) {
 
             ${currentWorkoutData ? `
             <div style="margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
-                <h4 style="margin-bottom: 10px;">📥 匯出 Garmin 訓練</h4>
-                <p style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 15px;">下載 JSON 檔案後，可匯入 Garmin Connect 使用</p>
-                <button class="btn-download-workout" onclick="downloadCurrentWorkout(${dayIndex})">
-                    下載 Garmin Workout JSON
-                </button>
+                <h4 style="margin-bottom: 10px;">📥 匯入 Garmin Connect</h4>
+                <p style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 15px;">點擊下方按鈕，下載訓練檔案並開啟 Garmin Connect 匯入頁面</p>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn-download-workout" onclick="downloadAndOpenGarmin(${dayIndex})">
+                        📥 一鍵匯入 Garmin Connect
+                    </button>
+                    <button class="btn-download-only" onclick="downloadCurrentWorkout(${dayIndex})">
+                        💾 僅下載 JSON
+                    </button>
+                </div>
+                <p style="font-size: 0.8rem; color: #888; margin-top: 10px;">匯入步驟：下載檔案 → Garmin Connect 開啟後點選「匯入」→ 選擇下載的 JSON 檔案</p>
             </div>
             ` : ''}
         </div>
@@ -724,7 +730,21 @@ function downloadCurrentWorkout(dayIndex) {
     downloadWorkoutJson(currentWorkoutData, filename);
 }
 
+// Download and open Garmin Connect
+function downloadAndOpenGarmin(dayIndex) {
+    if (!currentWorkoutData) return;
+
+    // Download the workout file
+    downloadCurrentWorkout(dayIndex);
+
+    // Open Garmin Connect workout page in new tab
+    setTimeout(() => {
+        window.open('https://connect.garmin.com/modern/workouts', '_blank');
+    }, 500);
+}
+
 window.downloadCurrentWorkout = downloadCurrentWorkout;
+window.downloadAndOpenGarmin = downloadAndOpenGarmin;
 window.showWorkoutModal = showWorkoutModal;
 
 function closeWorkoutModal() {
