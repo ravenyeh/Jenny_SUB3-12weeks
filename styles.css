@@ -1363,6 +1363,38 @@ body {
         font-size: 1.1rem;
     }
 
+    .source-credit {
+        max-width: 280px;
+        padding: 10px;
+        margin: 15px 0;
+    }
+
+    .source-image {
+        max-width: 260px;
+    }
+
+    .source-text {
+        font-size: 0.8rem;
+    }
+
+    .today-training {
+        padding: 15px;
+        margin: 15px auto;
+        max-width: 95%;
+    }
+
+    .today-label {
+        font-size: 0.8rem;
+    }
+
+    .today-title {
+        font-size: 1.1rem;
+    }
+
+    .today-description {
+        font-size: 0.85rem;
+    }
+
     .hero-stats {
         gap: 15px;
     }
@@ -1416,8 +1448,54 @@ body {
         gap: 10px;
     }
 
+    .hero-content h1 {
+        font-size: 1.6rem;
+    }
+
     .hero-date {
         align-items: center;
+    }
+
+    .source-credit {
+        max-width: 220px;
+        padding: 8px;
+        margin: 10px 0;
+    }
+
+    .source-image {
+        max-width: 200px;
+    }
+
+    .source-text {
+        font-size: 0.75rem;
+        margin-top: 6px;
+    }
+
+    .today-training {
+        padding: 12px;
+        margin: 10px auto;
+    }
+
+    .today-label {
+        font-size: 0.75rem;
+    }
+
+    .today-title {
+        font-size: 1rem;
+    }
+
+    .today-description {
+        font-size: 0.8rem;
+    }
+
+    .today-tags {
+        gap: 6px;
+    }
+
+    .today-phase,
+    .today-intensity {
+        font-size: 0.7rem;
+        padding: 3px 8px;
     }
 
     .summary-cards {
