@@ -210,7 +210,7 @@ export const trainingData = [
     { week: "Week 12", day: "Thu", date: "January 8, 2025", type: "Easy 輕鬆跑", content: "10km easy", intensity: "Z1-2", distance: 10, phase: "減量期", weeklyTotal: 100 },
     { week: "Week 12", day: "Fri", date: "January 9, 2025", type: "Easy 輕鬆跑", content: "10km easy", intensity: "Z1-2", distance: 10, phase: "減量期", weeklyTotal: 100 },
     { week: "Week 12", day: "Sat", date: "January 10, 2025", type: "Shakeout", content: "6km easy + 5x200m strides 衝刺", intensity: "Z1-2", distance: 7, phase: "減量期", weeklyTotal: 100, note: "Race Eve" },
-    { week: "Week 12", day: "Sun", date: "January 11, 2025", type: "Race Day", content: "Kaohsiung Marathon\n@ ~4:15/km", intensity: "Z4", distance: 42.195, phase: "減量期", weeklyTotal: 100, note: "Total: 100km ('A' Race)", race: "高雄馬拉松", isRaceDay: true }
+    { week: "Week 12", day: "Sun", date: "January 11, 2025", type: "Race Day", content: "Marathon of My Goal\n@ ~4:15/km", intensity: "Z4", distance: 42.195, phase: "減量期", weeklyTotal: 100, note: "Total: 100km ('A' Race)", race: "目標馬拉松", isRaceDay: true }
 ];
 
 // Weekly summary data for chart
