@@ -157,6 +157,51 @@ function updateSettingsDisplay() {
     if (raceDetailPace) {
         raceDetailPace.textContent = `~${params.MARATHON_PACE_STR}/km`;
     }
+
+    // Update pace strategy zones
+    updatePaceZones(params.MARATHON_PACE_SEC);
+}
+
+// Format seconds to pace string (e.g., 255 -> "4:15")
+function formatPaceFromSeconds(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Update pace strategy zones based on marathon pace
+function updatePaceZones(marathonPaceSeconds) {
+    // Calculate pace ranges for each zone
+    // Zone 1 (0-10km): Start conservative, +0 to +3 seconds slower
+    // Zone 2 (10-21km): Find rhythm, -3 to +0 seconds
+    // Zone 3 (21-30km): Maintain, -3 to +0 seconds
+    // Zone 4 (30-42km): Push hard, -5 to +0 seconds
+
+    const paceZone1 = document.getElementById('paceZone1');
+    const paceZone2 = document.getElementById('paceZone2');
+    const paceZone3 = document.getElementById('paceZone3');
+    const paceZone4 = document.getElementById('paceZone4');
+
+    if (paceZone1) {
+        const slow = formatPaceFromSeconds(marathonPaceSeconds + 3);
+        const fast = formatPaceFromSeconds(marathonPaceSeconds);
+        paceZone1.textContent = `${fast}-${slow}/km`;
+    }
+    if (paceZone2) {
+        const slow = formatPaceFromSeconds(marathonPaceSeconds);
+        const fast = formatPaceFromSeconds(marathonPaceSeconds - 3);
+        paceZone2.textContent = `${fast}-${slow}/km`;
+    }
+    if (paceZone3) {
+        const slow = formatPaceFromSeconds(marathonPaceSeconds);
+        const fast = formatPaceFromSeconds(marathonPaceSeconds - 3);
+        paceZone3.textContent = `${fast}-${slow}/km`;
+    }
+    if (paceZone4) {
+        const slow = formatPaceFromSeconds(marathonPaceSeconds);
+        const fast = formatPaceFromSeconds(marathonPaceSeconds - 5);
+        paceZone4.textContent = `${fast}-${slow}/km`;
+    }
 }
 
 // Make settings functions globally available
