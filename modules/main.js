@@ -776,15 +776,17 @@ function downloadCurrentWorkout(dayIndex) {
 function renderGarminSection(dayIndex) {
     const isLoggedIn = hasValidLogin();
     const user = getGarminUser();
+    const creds = getGarminCredentials();
 
-    if (isLoggedIn && user) {
+    if (isLoggedIn && creds) {
         // User is logged in - show one-click import
+        const displayEmail = creds.email || user?.displayName || 'Garmin 用戶';
         return `
             <div class="garmin-section">
                 <div class="garmin-header">
                     <h4>📥 匯入 Garmin Connect</h4>
                     <div class="garmin-user-info">
-                        <span class="garmin-user-name">✓ ${user.displayName || user.fullName || 'Garmin 用戶'}</span>
+                        <span class="saved-account-email">✓ ${displayEmail}</span>
                         <button class="btn-garmin-logout" onclick="handleGarminLogout(${dayIndex})">登出</button>
                     </div>
                 </div>
