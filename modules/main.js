@@ -2,6 +2,16 @@
 import { trainingData, weeklySummary, motivationQuotes, getMotivationQuote, getRaceDate, DEFAULT_RACE_DATE } from './trainingData.js';
 import { convertToGarminWorkout, downloadWorkoutJson } from './workoutBuilder.js';
 import { formatSecondsToPace, TRAINING_PARAMS, GOAL_PRESETS, refreshTrainingParams } from './paceZones.js';
+import {
+    hasValidLogin,
+    getGarminUser,
+    getGarminCredentials,
+    setGarminCredentials,
+    importWithCredentials,
+    garminLoginAndSave,
+    garminLogout,
+    updateGarminStatus
+} from './garminConnect.js';
 
 // Make data available globally
 window.trainingData = trainingData;
@@ -586,21 +596,7 @@ function showWorkoutModal(dayIndex) {
 
             ${stepsPreviewHtml}
 
-            ${currentWorkoutData ? `
-            <div style="margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
-                <h4 style="margin-bottom: 10px;">📥 匯入 Garmin Connect</h4>
-                <p style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 15px;">點擊下方按鈕，下載訓練檔案並開啟 Garmin Connect 匯入頁面</p>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button class="btn-download-workout" onclick="downloadAndOpenGarmin(${dayIndex})">
-                        📥 一鍵匯入 Garmin Connect
-                    </button>
-                    <button class="btn-download-only" onclick="downloadCurrentWorkout(${dayIndex})">
-                        💾 僅下載 JSON
-                    </button>
-                </div>
-                <p style="font-size: 0.8rem; color: #888; margin-top: 10px;">匯入步驟：下載檔案 → Garmin Connect 開啟後點選「匯入」→ 選擇下載的 JSON 檔案</p>
-            </div>
-            ` : ''}
+            ${currentWorkoutData ? renderGarminSection(dayIndex) : ''}
         </div>
         <div class="modal-footer">
             <button class="btn-close" onclick="closeWorkoutModal()">關閉</button>
@@ -731,6 +727,93 @@ function downloadCurrentWorkout(dayIndex) {
 }
 
 // Download and open Garmin Connect
+// Render Garmin Connect section based on login state
+function renderGarminSection(dayIndex) {
+    const isLoggedIn = hasValidLogin();
+    const user = getGarminUser();
+
+    if (isLoggedIn && user) {
+        // User is logged in - show one-click import
+        return `
+            <div class="garmin-section">
+                <div class="garmin-header">
+                    <h4>📥 匯入 Garmin Connect</h4>
+                    <div class="garmin-user-info">
+                        <span class="garmin-user-name">✓ ${user.displayName || user.fullName || 'Garmin 用戶'}</span>
+                        <button class="btn-garmin-logout" onclick="handleGarminLogout(${dayIndex})">登出</button>
+                    </div>
+                </div>
+                <div id="garminStatus" class="garmin-status" style="display: none;"></div>
+                <div class="garmin-actions">
+                    <button class="btn-garmin-import" onclick="handleOneClickImport(${dayIndex})">
+                        🚀 一鍵匯入 Garmin Connect
+                    </button>
+                </div>
+                <div class="garmin-divider">
+                    <span>或手動下載</span>
+                </div>
+                <div class="garmin-manual">
+                    <button class="btn-download-only" onclick="downloadCurrentWorkout(${dayIndex})">
+                        💾 下載 JSON 檔案
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        // User not logged in - show login form
+        return `
+            <div class="garmin-section">
+                <h4>📥 匯入 Garmin Connect</h4>
+                <p class="garmin-desc">首次使用請輸入 Garmin Connect 帳號，之後可一鍵匯入</p>
+                <div id="garminStatus" class="garmin-status" style="display: none;"></div>
+                <div class="garmin-login-form">
+                    <input type="email" id="garminEmail" placeholder="Garmin Email" class="garmin-input" />
+                    <input type="password" id="garminPassword" placeholder="密碼" class="garmin-input" />
+                    <button class="btn-garmin-login" onclick="handleGarminLogin(${dayIndex})">
+                        登入並匯入訓練
+                    </button>
+                </div>
+                <div class="garmin-divider">
+                    <span>或手動下載</span>
+                </div>
+                <div class="garmin-manual">
+                    <button class="btn-download-only" onclick="downloadAndOpenGarmin(${dayIndex})">
+                        📥 下載並開啟 Garmin Connect
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Handle Garmin login
+async function handleGarminLogin(dayIndex) {
+    const email = document.getElementById('garminEmail')?.value;
+    const password = document.getElementById('garminPassword')?.value;
+
+    if (!email || !password) {
+        updateGarminStatus('請輸入 Email 和密碼', true);
+        return;
+    }
+
+    await garminLoginAndSave(email, password, dayIndex, trainingData, convertToGarminWorkout, showWorkoutModal, getTrainingDate);
+}
+
+// Handle one-click import
+async function handleOneClickImport(dayIndex) {
+    await importWithCredentials(dayIndex, trainingData, convertToGarminWorkout, showWorkoutModal, getTrainingDate);
+}
+
+// Handle Garmin logout
+function handleGarminLogout(dayIndex) {
+    garminLogout(showWorkoutModal, dayIndex);
+}
+
+// Make handlers globally available
+window.handleGarminLogin = handleGarminLogin;
+window.handleOneClickImport = handleOneClickImport;
+window.handleGarminLogout = handleGarminLogout;
+
 function downloadAndOpenGarmin(dayIndex) {
     if (!currentWorkoutData) return;
 

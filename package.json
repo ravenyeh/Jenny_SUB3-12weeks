@@ -1,0 +1,13 @@
+{
+  "name": "jenny-marathon-training",
+  "version": "1.0.0",
+  "description": "Jenny Marathon Training Plan - 12 Weeks",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static site - no build needed'"
+  },
+  "dependencies": {
+    "@gooin/garmin-connect": "^1.6.4"
+  }
+}
