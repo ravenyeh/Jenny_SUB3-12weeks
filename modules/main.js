@@ -115,7 +115,7 @@ function updateSettingsDisplay() {
     const raceTitle = document.getElementById('raceTitle');
     const raceDateDisplay = document.getElementById('raceDateDisplay');
     if (raceTitle) {
-        raceTitle.textContent = `${params.GOAL_NAME} 馬拉松訓練`;
+        raceTitle.textContent = `Jenny 馬拉松訓練`;
     }
     if (raceDateDisplay) {
         raceDateDisplay.textContent = formatRaceDateDisplay(raceDate);
@@ -254,6 +254,9 @@ function displayTodayTraining() {
 
     if (!todayTrainingDiv) return;
 
+    // Get todayActions element for Garmin button
+    const todayActions = document.getElementById('todayActions');
+
     if (todayTrainingIndex >= 0) {
         const todayTraining = trainingData[todayTrainingIndex];
         todayLabel.textContent = '今日訓練';
@@ -263,6 +266,12 @@ function displayTodayTraining() {
         todayRun.textContent = `🏃 ${todayTraining.distance}km`;
         todayType.textContent = todayTraining.type;
         todayMotivation.textContent = `💪 ${getMotivationQuote(todayTrainingIndex)}`;
+
+        // Add Garmin export button
+        if (todayActions) {
+            todayActions.innerHTML = `<button class="btn-garmin-export" onclick="showWorkoutModal(${todayTrainingIndex})">📥 Garmin 訓練</button>`;
+        }
+
         todayTrainingDiv.style.display = 'block';
     } else {
         // Check if we're before training starts or after race
@@ -279,6 +288,7 @@ function displayTodayTraining() {
             todayRun.textContent = '';
             todayType.textContent = '';
             todayMotivation.textContent = '💪 做好準備，迎接挑戰！';
+            if (todayActions) todayActions.innerHTML = '';
         } else if (today > lastDate) {
             todayLabel.textContent = '訓練完成';
             todayPhase.textContent = '比賽日';
@@ -287,6 +297,7 @@ function displayTodayTraining() {
             todayRun.textContent = '';
             todayType.textContent = '';
             todayMotivation.textContent = '🏆 你做到了！';
+            if (todayActions) todayActions.innerHTML = '';
         } else {
             // Find next training day
             let nextTrainingIndex = -1;
@@ -309,6 +320,13 @@ function displayTodayTraining() {
                 todayRun.textContent = `🏃 ${nextTraining.distance}km`;
                 todayType.textContent = nextTraining.type;
                 todayMotivation.textContent = `💪 ${getMotivationQuote(nextTrainingIndex)}`;
+
+                // Add Garmin export button for next training
+                if (todayActions) {
+                    todayActions.innerHTML = `<button class="btn-garmin-export" onclick="showWorkoutModal(${nextTrainingIndex})">📥 Garmin 訓練</button>`;
+                }
+            } else if (todayActions) {
+                todayActions.innerHTML = '';
             }
         }
         todayTrainingDiv.style.display = 'block';
@@ -381,6 +399,7 @@ function populateSchedule(filter = 'all') {
             <td><span class="intensity-badge intensity-${item.intensity}">${item.intensity}</span></td>
             <td>${item.distance}km</td>
             <td>${weeklyTotalDisplay}</td>
+            <td><button class="btn-garmin-small" onclick="showWorkoutModal(${item.originalIndex})">📥</button></td>
         `;
 
         tbody.appendChild(row);
