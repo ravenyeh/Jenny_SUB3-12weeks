@@ -1285,6 +1285,54 @@ body {
     border-color: #007acc;
 }
 
+/* OTP Container */
+.garmin-otp-container {
+    margin-top: 10px;
+    padding: 12px;
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    border-radius: 8px;
+    border: 2px solid #ff9800;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.garmin-otp-hint {
+    margin: 0 0 10px 0;
+    color: #e65100;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.garmin-otp-hint::before {
+    content: '📧';
+}
+
+.garmin-otp-input {
+    text-align: center;
+    font-size: 1.2rem;
+    letter-spacing: 4px;
+    font-weight: 600;
+    border-color: #ff9800 !important;
+}
+
+.garmin-otp-input:focus {
+    border-color: #e65100 !important;
+    box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
+}
+
 .btn-garmin-login {
     padding: 14px 20px;
     background: linear-gradient(135deg, #007acc 0%, #005a9e 100%);
