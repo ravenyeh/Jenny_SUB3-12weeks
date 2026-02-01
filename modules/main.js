@@ -816,6 +816,10 @@ function renderGarminSection(dayIndex) {
                 <div class="garmin-login-form">
                     <input type="email" id="garminEmail" placeholder="Garmin Email" class="garmin-input" />
                     <input type="password" id="garminPassword" placeholder="密碼" class="garmin-input" />
+                    <div id="garminOtpContainer" class="garmin-otp-container" style="display: none;">
+                        <p class="garmin-otp-hint">Garmin 已發送驗證碼到您的 Email</p>
+                        <input type="text" id="garminOtp" placeholder="輸入 Email 驗證碼" class="garmin-input garmin-otp-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" />
+                    </div>
                     <button class="btn-garmin-login" onclick="handleGarminLogin(${dayIndex})">
                         登入並匯入訓練
                     </button>
@@ -837,13 +841,14 @@ function renderGarminSection(dayIndex) {
 async function handleGarminLogin(dayIndex) {
     const email = document.getElementById('garminEmail')?.value;
     const password = document.getElementById('garminPassword')?.value;
+    const mfaCode = document.getElementById('garminOtp')?.value || null;
 
     if (!email || !password) {
         updateGarminStatus('請輸入 Email 和密碼', true);
         return;
     }
 
-    await garminLoginAndSave(email, password, dayIndex, trainingData, convertToGarminWorkout, showWorkoutModal, getTrainingDate);
+    await garminLoginAndSave(email, password, dayIndex, trainingData, convertToGarminWorkout, showWorkoutModal, getTrainingDate, mfaCode);
 }
 
 // Handle one-click import

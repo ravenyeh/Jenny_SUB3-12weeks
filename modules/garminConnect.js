@@ -155,6 +155,25 @@ export async function importWithCredentials(dayIndex, trainingData, convertToGar
             setGarminUser(data.user);
         }
 
+        // Check if MFA is needed - user needs to re-login with OTP
+        if (data.needsMfa) {
+            // Clear credentials to force re-login
+            clearGarminCredentials();
+            clearGarminUser();
+            updateGarminStatus('需要重新登入並輸入驗證碼', true);
+            // Refresh the modal to show login form
+            setTimeout(() => {
+                if (showWorkoutModal) {
+                    showWorkoutModal(dayIndex);
+                    // Show OTP input after modal refreshes
+                    setTimeout(() => {
+                        showOtpInput();
+                    }, 100);
+                }
+            }, 500);
+            return false;
+        }
+
         if (data.success) {
             updateGarminStatus('✅ ' + (data.message || '匯入成功！'), false);
             setTimeout(() => {
@@ -177,14 +196,46 @@ export async function importWithCredentials(dayIndex, trainingData, convertToGar
     }
 }
 
+// Show OTP input container
+export function showOtpInput() {
+    const otpContainer = document.getElementById('garminOtpContainer');
+    if (otpContainer) {
+        otpContainer.style.display = 'block';
+        // Focus on the OTP input
+        setTimeout(() => {
+            const otpInput = document.getElementById('garminOtp');
+            if (otpInput) {
+                otpInput.focus();
+            }
+        }, 100);
+    }
+}
+
+// Hide OTP input container
+export function hideOtpInput() {
+    const otpContainer = document.getElementById('garminOtpContainer');
+    if (otpContainer) {
+        otpContainer.style.display = 'none';
+    }
+    // Clear OTP value
+    const otpInput = document.getElementById('garminOtp');
+    if (otpInput) {
+        otpInput.value = '';
+    }
+}
+
 // Login and save credentials
-export async function garminLoginAndSave(email, password, dayIndex, trainingData, convertToGarminWorkout, showWorkoutModal, getTrainingDate) {
+export async function garminLoginAndSave(email, password, dayIndex, trainingData, convertToGarminWorkout, showWorkoutModal, getTrainingDate, mfaCode = null) {
     if (!email || !password) {
         updateGarminStatus('請輸入 Email 和密碼', true);
         return false;
     }
 
-    updateGarminStatus('登入並匯入中...', false);
+    if (mfaCode) {
+        updateGarminStatus('驗證中...', false);
+    } else {
+        updateGarminStatus('登入並匯入中...', false);
+    }
 
     // Save credentials
     setGarminCredentials(email, password);
@@ -218,14 +269,21 @@ export async function garminLoginAndSave(email, password, dayIndex, trainingData
     }));
 
     try {
+        const requestBody = {
+            email,
+            password,
+            workouts: workoutPayloads
+        };
+
+        // Add MFA code if provided
+        if (mfaCode) {
+            requestBody.mfaCode = mfaCode;
+        }
+
         const response = await fetch('/api/garmin/import', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                email,
-                password,
-                workouts: workoutPayloads
-            })
+            body: JSON.stringify(requestBody)
         });
 
         const contentType = response.headers.get('content-type');
@@ -237,6 +295,13 @@ export async function garminLoginAndSave(email, password, dayIndex, trainingData
 
         const data = await response.json();
 
+        // Check if MFA is needed
+        if (data.needsMfa) {
+            updateGarminStatus(data.message || '請輸入 Email 收到的驗證碼', true);
+            showOtpInput();
+            return false;
+        }
+
         if (data.oauth2Token) {
             setGarminToken(data.oauth2Token);
         }
@@ -245,6 +310,7 @@ export async function garminLoginAndSave(email, password, dayIndex, trainingData
         }
 
         if (data.success) {
+            hideOtpInput();
             updateGarminStatus('✅ ' + (data.message || '登入成功並已匯入訓練！'), false);
             setTimeout(() => {
                 if (showWorkoutModal) {
@@ -253,13 +319,21 @@ export async function garminLoginAndSave(email, password, dayIndex, trainingData
             }, 1500);
             return true;
         } else {
-            clearGarminCredentials();
-            clearGarminUser();
-            updateGarminStatus(`登入失敗：${data.error}`, true);
+            // Check if it's an MFA error
+            if (data.needsMfa || (data.error && data.error.includes('驗證碼'))) {
+                updateGarminStatus(data.message || data.error || '請輸入驗證碼', true);
+                showOtpInput();
+            } else {
+                clearGarminCredentials();
+                clearGarminUser();
+                hideOtpInput();
+                updateGarminStatus(`登入失敗：${data.error}`, true);
+            }
             return false;
         }
     } catch (error) {
         clearGarminCredentials();
+        hideOtpInput();
         updateGarminStatus(`連線錯誤：${error.message}`, true);
         return false;
     }

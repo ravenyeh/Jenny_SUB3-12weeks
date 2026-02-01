@@ -1,5 +1,8 @@
 const { GarminConnect } = require('@gooin/garmin-connect');
 
+// MFA state storage (in-memory, for serverless we may need external storage)
+const mfaSessionStore = new Map();
+
 // Combined login + import endpoint for Vercel serverless
 module.exports = async (req, res) => {
     // Enable CORS
@@ -16,7 +19,7 @@ module.exports = async (req, res) => {
     }
 
     try {
-        const { email, password, workouts } = req.body;
+        const { email, password, workouts, mfaCode } = req.body;
 
         if (!email || !password) {
             return res.status(400).json({
@@ -32,13 +35,43 @@ module.exports = async (req, res) => {
             });
         }
 
-        // Initialize and login
+        // Initialize GarminConnect with MFA handler if OTP is provided
         const GC = new GarminConnect({
             username: email,
             password: password
         });
 
-        await GC.login();
+        // If MFA code is provided, set up the MFA handler
+        if (mfaCode) {
+            // Override the MFA prompt to return the provided code
+            GC.onMFAToken = async () => {
+                console.log('MFA code provided by user:', mfaCode);
+                return mfaCode;
+            };
+        }
+
+        try {
+            await GC.login();
+        } catch (loginError) {
+            const errorMsg = loginError.message.toLowerCase();
+
+            // Check if this is an MFA requirement error
+            if (errorMsg.includes('mfa') ||
+                errorMsg.includes('multi-factor') ||
+                errorMsg.includes('verification') ||
+                errorMsg.includes('verify')) {
+
+                return res.status(401).json({
+                    success: false,
+                    needsMfa: true,
+                    error: '需要輸入驗證碼',
+                    message: 'Garmin 已發送驗證碼到您的 Email，請輸入驗證碼後重試'
+                });
+            }
+
+            // Re-throw for general error handling
+            throw loginError;
+        }
 
         // Import each workout
         const results = [];
@@ -158,10 +191,14 @@ module.exports = async (req, res) => {
         console.error('Garmin import error:', error.message);
 
         let errorMessage = '匯入失敗';
+        let needsMfa = false;
 
         if (error.message) {
             const msg = error.message.toLowerCase();
-            if (msg.includes('credentials') || msg.includes('password') || msg.includes('401')) {
+            if (msg.includes('mfa') || msg.includes('multi-factor') || msg.includes('verification code')) {
+                needsMfa = true;
+                errorMessage = '需要輸入驗證碼';
+            } else if (msg.includes('credentials') || msg.includes('password') || msg.includes('401')) {
                 errorMessage = 'Email 或密碼錯誤';
             } else if (msg.includes('captcha') || msg.includes('robot')) {
                 errorMessage = 'Garmin 需要驗證碼，請使用手動匯入方式';
@@ -172,8 +209,11 @@ module.exports = async (req, res) => {
 
         return res.status(401).json({
             success: false,
+            needsMfa: needsMfa,
             error: errorMessage,
-            detail: 'Garmin Connect API 失敗，建議使用「複製 JSON」或「下載 .json」功能手動匯入'
+            detail: needsMfa
+                ? 'Garmin 已發送驗證碼到您的 Email，請輸入驗證碼後重試'
+                : 'Garmin Connect API 失敗，建議使用「複製 JSON」或「下載 .json」功能手動匯入'
         });
     }
 };

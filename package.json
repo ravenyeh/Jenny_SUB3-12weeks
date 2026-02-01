@@ -8,6 +8,6 @@
     "build": "echo 'Static site - no build required'"
   },
   "dependencies": {
-    "@gooin/garmin-connect": "1.6.6"
+    "@gooin/garmin-connect": "^1.7.5"
   }
 }
