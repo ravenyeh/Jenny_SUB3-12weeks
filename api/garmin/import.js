@@ -1,8 +1,5 @@
 const { GarminConnect } = require('@gooin/garmin-connect');
 
-// MFA state storage (in-memory, for serverless we may need external storage)
-const mfaSessionStore = new Map();
-
 // Combined login + import endpoint for Vercel serverless
 module.exports = async (req, res) => {
     // Enable CORS
@@ -35,31 +32,31 @@ module.exports = async (req, res) => {
             });
         }
 
-        // Initialize GarminConnect with MFA handler if OTP is provided
+        // Initialize GarminConnect
         const GC = new GarminConnect({
             username: email,
             password: password
         });
 
-        // If MFA code is provided, set up the MFA handler
-        if (mfaCode) {
-            // Override the MFA prompt to return the provided code
-            GC.onMFAToken = async () => {
-                console.log('MFA code provided by user:', mfaCode);
-                return mfaCode;
-            };
+        // Set up MFA handler if the library supports it
+        if (mfaCode && typeof GC.setMFACode === 'function') {
+            GC.setMFACode(mfaCode);
         }
 
+        // Try to login
         try {
             await GC.login();
         } catch (loginError) {
-            const errorMsg = loginError.message.toLowerCase();
+            const errorMsg = (loginError.message || '').toLowerCase();
+            console.error('Login error:', loginError.message);
 
-            // Check if this is an MFA requirement error
+            // Check if this is an MFA requirement
             if (errorMsg.includes('mfa') ||
                 errorMsg.includes('multi-factor') ||
                 errorMsg.includes('verification') ||
-                errorMsg.includes('verify')) {
+                errorMsg.includes('verify') ||
+                errorMsg.includes('two-step') ||
+                errorMsg.includes('2fa')) {
 
                 return res.status(401).json({
                     success: false,
@@ -69,7 +66,18 @@ module.exports = async (req, res) => {
                 });
             }
 
-            // Re-throw for general error handling
+            // Check for credential errors
+            if (errorMsg.includes('credentials') ||
+                errorMsg.includes('password') ||
+                errorMsg.includes('unauthorized') ||
+                errorMsg.includes('401')) {
+                return res.status(401).json({
+                    success: false,
+                    error: 'Email 或密碼錯誤'
+                });
+            }
+
+            // Other errors
             throw loginError;
         }
 
@@ -84,7 +92,6 @@ module.exports = async (req, res) => {
                 try {
                     createdWorkout = await GC.addWorkout(workout);
                 } catch (e) {
-                    // Try alternative method if addWorkout doesn't exist
                     console.log('addWorkout failed, trying alternative:', e.message);
 
                     if (GC.client && GC.client.post) {
@@ -98,22 +105,16 @@ module.exports = async (req, res) => {
                     }
                 }
 
-                // Schedule if date provided - use correct scheduleWorkout format
+                // Schedule if date provided
                 let scheduled = false;
                 if (scheduledDate && createdWorkout && createdWorkout.workoutId) {
                     try {
-                        console.log('Scheduling workout:', createdWorkout.workoutId, 'to date:', scheduledDate);
-
-                        // Correct format: first param is object with workoutId, second is Date object
                         if (typeof GC.scheduleWorkout === 'function') {
                             await GC.scheduleWorkout(
                                 { workoutId: createdWorkout.workoutId },
                                 new Date(scheduledDate)
                             );
                             scheduled = true;
-                            console.log('Workout scheduled successfully');
-                        } else {
-                            console.log('scheduleWorkout method not available');
                         }
                     } catch (e) {
                         console.log('Schedule failed:', e.message);
@@ -149,19 +150,18 @@ module.exports = async (req, res) => {
         // Get OAuth2 token for client-side storage
         const oauth2Token = GC.client?.oauth2Token || null;
 
-        // Get user profile and social profile
+        // Get user profile
         let user = null;
         try {
             const userProfile = await GC.getUserProfile();
 
-            // Try to fetch social profile for fullName and avatar
             let socialProfile = null;
             if (userProfile.displayName) {
                 try {
                     const socialUrl = `https://connect.garmin.com/modern/proxy/userprofile-service/socialProfile/${userProfile.displayName}`;
                     socialProfile = await GC.get(socialUrl);
                 } catch (e) {
-                    // Social profile fetch is optional, continue without it
+                    // Social profile fetch is optional
                 }
             }
 
@@ -171,7 +171,7 @@ module.exports = async (req, res) => {
                 profileImageUrl: socialProfile?.profileImageUrlSmall || userProfile.profileImageUrlSmall || null
             };
         } catch (e) {
-            // User profile fetch is optional, continue without it
+            // User profile fetch is optional
         }
 
         return res.status(200).json({
@@ -190,21 +190,19 @@ module.exports = async (req, res) => {
     } catch (error) {
         console.error('Garmin import error:', error.message);
 
+        const msg = (error.message || '').toLowerCase();
         let errorMessage = '匯入失敗';
         let needsMfa = false;
 
-        if (error.message) {
-            const msg = error.message.toLowerCase();
-            if (msg.includes('mfa') || msg.includes('multi-factor') || msg.includes('verification code')) {
-                needsMfa = true;
-                errorMessage = '需要輸入驗證碼';
-            } else if (msg.includes('credentials') || msg.includes('password') || msg.includes('401')) {
-                errorMessage = 'Email 或密碼錯誤';
-            } else if (msg.includes('captcha') || msg.includes('robot')) {
-                errorMessage = 'Garmin 需要驗證碼，請使用手動匯入方式';
-            } else if (msg.includes('blocked') || msg.includes('forbidden')) {
-                errorMessage = 'Garmin 暫時封鎖此連線，請使用手動匯入';
-            }
+        if (msg.includes('mfa') || msg.includes('multi-factor') || msg.includes('verification') || msg.includes('2fa')) {
+            needsMfa = true;
+            errorMessage = '需要輸入驗證碼';
+        } else if (msg.includes('credentials') || msg.includes('password') || msg.includes('401')) {
+            errorMessage = 'Email 或密碼錯誤';
+        } else if (msg.includes('captcha') || msg.includes('robot')) {
+            errorMessage = 'Garmin 需要驗證碼，請使用手動匯入方式';
+        } else if (msg.includes('blocked') || msg.includes('forbidden')) {
+            errorMessage = 'Garmin 暫時封鎖此連線，請使用手動匯入';
         }
 
         return res.status(401).json({
