@@ -1,6 +1,9 @@
 const { GarminConnect } = require('garmin-connect');
 
-// Combined login + MFA verify + import endpoint for Vercel serverless
+// Combined login + import endpoint for Vercel serverless
+// Supports two-step MFA flow:
+//   Step 1: Send email/password/workouts → may return { needsMfa, mfaSession }
+//   Step 2: Send mfaSession/mfaCode/workouts → completes import
 module.exports = async (req, res) => {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,12 +21,49 @@ module.exports = async (req, res) => {
     try {
         const { email, password, workouts, mfaSession, mfaCode } = req.body;
 
-        // Step 2: MFA verification flow
+        // Step 2: MFA verification (no credentials needed)
         if (mfaSession && mfaCode) {
-            return await handleMfaVerifyAndImport(req, res, mfaSession, mfaCode, workouts);
+            if (!workouts || !Array.isArray(workouts) || workouts.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: '請提供訓練資料'
+                });
+            }
+
+            const GC = new GarminConnect({ username: '', password: '' });
+
+            try {
+                await GC.verifyMFA(mfaSession, mfaCode);
+            } catch (e) {
+                const msg = e.message.toLowerCase();
+                let errorMessage = 'MFA 驗證失敗';
+                let sessionExpired = false;
+
+                if (msg.includes('expired')) {
+                    errorMessage = '驗證碼已過期（5 分鐘），請重新登入';
+                    sessionExpired = true;
+                } else if (msg.includes('invalid') && msg.includes('session')) {
+                    errorMessage = 'Session 無效，請重新登入';
+                    sessionExpired = true;
+                } else if (msg.includes('mfa_secret_key')) {
+                    errorMessage = '伺服器 MFA 設定錯誤';
+                    sessionExpired = true;
+                } else if (msg.includes('code') || msg.includes('invalid')) {
+                    errorMessage = '驗證碼錯誤，請重新輸入';
+                }
+
+                return res.status(401).json({
+                    success: false,
+                    error: errorMessage,
+                    sessionExpired: sessionExpired
+                });
+            }
+
+            // MFA verified, import workouts
+            return await importWorkouts(GC, workouts, res);
         }
 
-        // Step 1: Initial login flow
+        // Step 1: Login with credentials
         if (!email || !password) {
             return res.status(400).json({
                 success: false,
@@ -38,24 +78,41 @@ module.exports = async (req, res) => {
             });
         }
 
-        return await handleLoginAndImport(req, res, email, password, workouts);
+        // Initialize and login
+        const GC = new GarminConnect({
+            username: email,
+            password: password
+        });
+
+        const loginResult = await GC.login();
+
+        // Check if MFA is required
+        if (loginResult && loginResult.needsMFA) {
+            return res.status(200).json({
+                success: false,
+                needsMfa: true,
+                mfaSession: loginResult.mfaSession,
+                message: '請輸入 Garmin 傳送的驗證碼'
+            });
+        }
+
+        // No MFA needed, import directly
+        return await importWorkouts(GC, workouts, res);
 
     } catch (error) {
         console.error('Garmin import error:', error.message);
 
-        const msg = (error.message || '').toLowerCase();
         let errorMessage = '匯入失敗';
 
-        if (msg.includes('credentials') || msg.includes('password') || msg.includes('401')) {
-            errorMessage = 'Email 或密碼錯誤';
-        } else if (msg.includes('captcha') || msg.includes('robot')) {
-            errorMessage = 'Garmin 需要驗證碼，請使用手動匯入方式';
-        } else if (msg.includes('blocked') || msg.includes('forbidden')) {
-            errorMessage = 'Garmin 暫時封鎖此連線，請使用手動匯入';
-        } else if (msg.includes('mfa_secret_key')) {
-            errorMessage = '伺服器未設定 MFA_SECRET_KEY 環境變數';
-        } else if (msg.includes('accountlocked')) {
-            errorMessage = '帳號已被鎖定，請至 Garmin Connect 網站解鎖';
+        if (error.message) {
+            const msg = error.message.toLowerCase();
+            if (msg.includes('credentials') || msg.includes('password') || msg.includes('401')) {
+                errorMessage = 'Email 或密碼錯誤';
+            } else if (msg.includes('captcha') || msg.includes('robot')) {
+                errorMessage = 'Garmin 需要驗證碼，請使用手動匯入方式';
+            } else if (msg.includes('blocked') || msg.includes('forbidden')) {
+                errorMessage = 'Garmin 暫時封鎖此連線，請使用手動匯入';
+            }
         }
 
         return res.status(401).json({
@@ -66,76 +123,8 @@ module.exports = async (req, res) => {
     }
 };
 
-// Step 1: Login and check for MFA
-async function handleLoginAndImport(req, res, email, password, workouts) {
-    const GC = new GarminConnect({
-        username: email,
-        password: password
-    });
-
-    const result = await GC.login();
-
-    // Check if MFA is required (ravenyeh/garmin-connect returns { needsMFA, mfaSession })
-    if (result && result.needsMFA) {
-        return res.status(200).json({
-            success: false,
-            needsMfa: true,
-            mfaSession: result.mfaSession,
-            message: 'Garmin 已發送驗證碼到您的 Email，請輸入驗證碼'
-        });
-    }
-
-    // Login successful, proceed to import workouts
-    return await importWorkouts(res, GC, workouts, email);
-}
-
-// Step 2: Verify MFA then import
-async function handleMfaVerifyAndImport(req, res, mfaSession, mfaCode, workouts) {
-    if (!workouts || !Array.isArray(workouts) || workouts.length === 0) {
-        return res.status(400).json({
-            success: false,
-            error: '請提供訓練資料'
-        });
-    }
-
-    // Create a new GarminConnect instance (credentials not needed for MFA verification)
-    const GC = new GarminConnect({ username: '', password: '' });
-
-    // Verify MFA with session and code - dedicated error handling
-    try {
-        await GC.verifyMFA(mfaSession, mfaCode);
-    } catch (mfaError) {
-        const msg = (mfaError.message || '').toLowerCase();
-        console.error('MFA verify error:', mfaError.message);
-
-        let errorMessage = '驗證碼錯誤，請重新輸入';
-        let canRetry = true;
-
-        if (msg.includes('expired') || msg.includes('過期')) {
-            errorMessage = '驗證碼已過期，請重新登入';
-            canRetry = false;
-        } else if (msg.includes('invalid') || msg.includes('corrupted')) {
-            errorMessage = 'MFA session 無效，請重新登入';
-            canRetry = false;
-        } else if (msg.includes('mfa_secret_key')) {
-            errorMessage = '伺服器未設定 MFA_SECRET_KEY 環境變數';
-            canRetry = false;
-        }
-
-        return res.status(401).json({
-            success: false,
-            mfaError: true,
-            canRetry: canRetry,
-            error: errorMessage
-        });
-    }
-
-    // MFA verified, proceed to import workouts
-    return await importWorkouts(res, GC, workouts, null);
-}
-
-// Import workouts using authenticated GC instance
-async function importWorkouts(res, GC, workouts, email) {
+// Shared workout import logic
+async function importWorkouts(GC, workouts, res) {
     const results = [];
     for (const workoutData of workouts) {
         try {
@@ -163,15 +152,21 @@ async function importWorkouts(res, GC, workouts, email) {
             let scheduled = false;
             if (scheduledDate && createdWorkout && createdWorkout.workoutId) {
                 try {
-                    const scheduleUrl = `https://connect.garmin.com/modern/proxy/workout-service/schedule/${createdWorkout.workoutId}`;
-                    const scheduleBody = { date: scheduledDate };
-                    try {
-                        await GC.post(scheduleUrl, scheduleBody);
+                    if (typeof GC.scheduleWorkout === 'function') {
+                        await GC.scheduleWorkout(
+                            { workoutId: createdWorkout.workoutId },
+                            new Date(scheduledDate)
+                        );
                         scheduled = true;
-                    } catch (e1) {
-                        console.log('GC.post schedule failed, trying client.post:', e1.message);
-                        if (GC.client && GC.client.post) {
-                            await GC.client.post(scheduleUrl, scheduleBody);
+                    } else {
+                        // Fallback: direct POST to Garmin schedule API
+                        const scheduleUrl = `https://connect.garmin.com/modern/proxy/workout-service/schedule/${createdWorkout.workoutId}`;
+                        const body = { date: scheduledDate };
+                        if (typeof GC.post === 'function') {
+                            await GC.post(scheduleUrl, body);
+                            scheduled = true;
+                        } else if (GC.client && GC.client.post) {
+                            await GC.client.post(scheduleUrl, body);
                             scheduled = true;
                         }
                     }
@@ -225,7 +220,7 @@ async function importWorkouts(res, GC, workouts, email) {
         }
 
         user = {
-            displayName: userProfile.displayName || (email ? email.split('@')[0] : 'User'),
+            displayName: userProfile.displayName || 'User',
             fullName: socialProfile?.fullName || socialProfile?.userProfileFullName || userProfile.fullName || null,
             profileImageUrl: socialProfile?.profileImageUrlSmall || userProfile.profileImageUrlSmall || null
         };
