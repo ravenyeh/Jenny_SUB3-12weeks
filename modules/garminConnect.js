@@ -295,14 +295,27 @@ export async function garminLoginAndSave(email, password, dayIndex, trainingData
                 }, 1500);
                 return true;
             } else {
-                updateGarminStatus(`驗證失敗：${data.error}`, true);
-                // Keep MFA session alive for retry with different code
+                // Check if MFA session is still valid for retry
+                if (data.mfaError && data.canRetry === false) {
+                    // Session expired or invalid - must re-login
+                    clearPendingMfa();
+                    hideOtpInput();
+                    updateGarminStatus(`${data.error}`, true);
+                } else {
+                    // Wrong code - keep session alive, let user retry
+                    updateGarminStatus(`${data.error || '驗證碼錯誤，請重新輸入'}`, true);
+                    // Clear the OTP input for retry
+                    const otpInput = document.getElementById('garminOtp');
+                    if (otpInput) {
+                        otpInput.value = '';
+                        otpInput.focus();
+                    }
+                }
                 return false;
             }
         } catch (error) {
-            clearPendingMfa();
-            hideOtpInput();
-            updateGarminStatus(`連線錯誤：${error.message}`, true);
+            // Network error - keep MFA session alive for retry
+            updateGarminStatus(`連線錯誤：${error.message}，請重試`, true);
             return false;
         }
     }
