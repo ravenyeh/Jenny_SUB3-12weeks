@@ -163,9 +163,18 @@ async function importWorkouts(res, GC, workouts, email) {
             let scheduled = false;
             if (scheduledDate && createdWorkout && createdWorkout.workoutId) {
                 try {
-                    const scheduleUrl = `https://connect.garmin.com/workout-service/schedule/${createdWorkout.workoutId}`;
-                    await GC.put(scheduleUrl, { date: scheduledDate });
-                    scheduled = true;
+                    const scheduleUrl = `https://connect.garmin.com/modern/proxy/workout-service/schedule/${createdWorkout.workoutId}`;
+                    const scheduleBody = { date: scheduledDate };
+                    try {
+                        await GC.post(scheduleUrl, scheduleBody);
+                        scheduled = true;
+                    } catch (e1) {
+                        console.log('GC.post schedule failed, trying client.post:', e1.message);
+                        if (GC.client && GC.client.post) {
+                            await GC.client.post(scheduleUrl, scheduleBody);
+                            scheduled = true;
+                        }
+                    }
                 } catch (e) {
                     console.log('Schedule failed:', e.message);
                 }
