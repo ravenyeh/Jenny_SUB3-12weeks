@@ -151,27 +151,22 @@ async function importWorkouts(GC, workouts, res) {
             // Schedule if date provided
             let scheduled = false;
             if (scheduledDate && createdWorkout && createdWorkout.workoutId) {
+                // Use connectapi.garmin.com (same domain as other API calls, OAuth2 token works here)
+                const scheduleUrl = `https://connectapi.garmin.com/workout-service/schedule/${createdWorkout.workoutId}`;
+                const body = { date: scheduledDate };
                 try {
-                    if (typeof GC.scheduleWorkout === 'function') {
-                        await GC.scheduleWorkout(
-                            { workoutId: createdWorkout.workoutId },
-                            new Date(scheduledDate)
-                        );
-                        scheduled = true;
-                    } else {
-                        // Fallback: direct POST to Garmin schedule API
-                        const scheduleUrl = `https://connect.garmin.com/modern/proxy/workout-service/schedule/${createdWorkout.workoutId}`;
-                        const body = { date: scheduledDate };
-                        if (typeof GC.post === 'function') {
-                            await GC.post(scheduleUrl, body);
-                            scheduled = true;
-                        } else if (GC.client && GC.client.post) {
-                            await GC.client.post(scheduleUrl, body);
-                            scheduled = true;
-                        }
-                    }
+                    await GC.post(scheduleUrl, body);
+                    scheduled = true;
                 } catch (e) {
-                    console.log('Schedule failed:', e.message);
+                    console.log('Schedule via connectapi failed:', e.message);
+                    // Fallback: try connect.garmin.com/modern/proxy/ (cookie-based auth)
+                    try {
+                        const proxyUrl = `https://connect.garmin.com/modern/proxy/workout-service/schedule/${createdWorkout.workoutId}`;
+                        await GC.post(proxyUrl, body);
+                        scheduled = true;
+                    } catch (e2) {
+                        console.log('Schedule via proxy also failed:', e2.message);
+                    }
                 }
             }
 
