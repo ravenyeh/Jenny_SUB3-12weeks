@@ -52,7 +52,7 @@ module.exports = async (req, res) => {
             errorMessage = 'Garmin 需要驗證碼，請使用手動匯入方式';
         } else if (msg.includes('blocked') || msg.includes('forbidden')) {
             errorMessage = 'Garmin 暫時封鎖此連線，請使用手動匯入';
-        } else if (msg.includes('MFA_SECRET_KEY')) {
+        } else if (msg.includes('mfa_secret_key')) {
             errorMessage = '伺服器未設定 MFA_SECRET_KEY 環境變數';
         } else if (msg.includes('accountlocked')) {
             errorMessage = '帳號已被鎖定，請至 Garmin Connect 網站解鎖';
@@ -101,8 +101,34 @@ async function handleMfaVerifyAndImport(req, res, mfaSession, mfaCode, workouts)
     // Create a new GarminConnect instance (credentials not needed for MFA verification)
     const GC = new GarminConnect({ username: '', password: '' });
 
-    // Verify MFA with session and code
-    await GC.verifyMFA(mfaSession, mfaCode);
+    // Verify MFA with session and code - dedicated error handling
+    try {
+        await GC.verifyMFA(mfaSession, mfaCode);
+    } catch (mfaError) {
+        const msg = (mfaError.message || '').toLowerCase();
+        console.error('MFA verify error:', mfaError.message);
+
+        let errorMessage = '驗證碼錯誤，請重新輸入';
+        let canRetry = true;
+
+        if (msg.includes('expired') || msg.includes('過期')) {
+            errorMessage = '驗證碼已過期，請重新登入';
+            canRetry = false;
+        } else if (msg.includes('invalid') || msg.includes('corrupted')) {
+            errorMessage = 'MFA session 無效，請重新登入';
+            canRetry = false;
+        } else if (msg.includes('mfa_secret_key')) {
+            errorMessage = '伺服器未設定 MFA_SECRET_KEY 環境變數';
+            canRetry = false;
+        }
+
+        return res.status(401).json({
+            success: false,
+            mfaError: true,
+            canRetry: canRetry,
+            error: errorMessage
+        });
+    }
 
     // MFA verified, proceed to import workouts
     return await importWorkouts(res, GC, workouts, null);
