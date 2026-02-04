@@ -296,7 +296,7 @@ export async function garminLoginAndSave(email, password, dayIndex, trainingData
                 return true;
             } else {
                 // Check if MFA session is still valid for retry
-                if (data.mfaError && data.canRetry === false) {
+                if (data.sessionExpired) {
                     // Session expired or invalid - must re-login
                     clearPendingMfa();
                     hideOtpInput();
