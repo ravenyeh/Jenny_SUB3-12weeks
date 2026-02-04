@@ -4,6 +4,10 @@ const GARMIN_TOKEN_KEY = 'garmin_oauth2_token';
 const GARMIN_USER_KEY = 'garmin_user_info';
 const GARMIN_CREDS_KEY = 'garmin_credentials';
 
+// In-memory MFA session (not persisted - only valid during current login flow)
+let pendingMfaSession = null;
+let pendingWorkouts = null;
+
 // Get Garmin OAuth2 token from localStorage
 export function getGarminToken() {
     try {
@@ -75,6 +79,17 @@ export function hasValidLogin() {
     const creds = getGarminCredentials();
     const user = getGarminUser();
     return !!(creds && creds.email && creds.password && user);
+}
+
+// Check if there's a pending MFA session
+export function hasPendingMfa() {
+    return !!pendingMfaSession;
+}
+
+// Clear pending MFA session
+export function clearPendingMfa() {
+    pendingMfaSession = null;
+    pendingWorkouts = null;
 }
 
 // Update Garmin status message
@@ -155,17 +170,15 @@ export async function importWithCredentials(dayIndex, trainingData, convertToGar
             setGarminUser(data.user);
         }
 
-        // Check if MFA is needed - user needs to re-login with OTP
+        // Check if MFA is needed - store mfaSession for step 2
         if (data.needsMfa) {
-            // Clear credentials to force re-login
-            clearGarminCredentials();
-            clearGarminUser();
-            updateGarminStatus('需要重新登入並輸入驗證碼', true);
-            // Refresh the modal to show login form
+            pendingMfaSession = data.mfaSession;
+            pendingWorkouts = workoutPayloads;
+            updateGarminStatus('請輸入 Email 收到的驗證碼', true);
+            // Refresh the modal to show login form with OTP
             setTimeout(() => {
                 if (showWorkoutModal) {
                     showWorkoutModal(dayIndex);
-                    // Show OTP input after modal refreshes
                     setTimeout(() => {
                         showOtpInput();
                     }, 100);
@@ -209,6 +222,11 @@ export function showOtpInput() {
             }
         }, 100);
     }
+    // Update button text to indicate MFA step
+    const loginBtn = document.querySelector('.btn-garmin-login');
+    if (loginBtn) {
+        loginBtn.textContent = '驗證並匯入訓練';
+    }
 }
 
 // Hide OTP input container
@@ -222,25 +240,82 @@ export function hideOtpInput() {
     if (otpInput) {
         otpInput.value = '';
     }
+    // Restore button text
+    const loginBtn = document.querySelector('.btn-garmin-login');
+    if (loginBtn) {
+        loginBtn.textContent = '登入並匯入訓練';
+    }
 }
 
-// Login and save credentials
+// Login and save credentials (Step 1: login, Step 2: MFA verify)
 export async function garminLoginAndSave(email, password, dayIndex, trainingData, convertToGarminWorkout, showWorkoutModal, getTrainingDate, mfaCode = null) {
+    // Step 2: MFA verification with pending session
+    if (mfaCode && pendingMfaSession) {
+        updateGarminStatus('驗證中...', false);
+
+        try {
+            const response = await fetch('/api/garmin/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mfaSession: pendingMfaSession,
+                    mfaCode: mfaCode,
+                    workouts: pendingWorkouts
+                })
+            });
+
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                updateGarminStatus('伺服器錯誤，請稍後再試', true);
+                clearPendingMfa();
+                return false;
+            }
+
+            const data = await response.json();
+
+            if (data.oauth2Token) {
+                setGarminToken(data.oauth2Token);
+            }
+            if (data.user) {
+                setGarminUser(data.user);
+            }
+
+            if (data.success) {
+                // MFA verified and workouts imported - save credentials
+                if (email && password) {
+                    setGarminCredentials(email, password);
+                }
+                clearPendingMfa();
+                hideOtpInput();
+                updateGarminStatus('✅ ' + (data.message || '驗證成功並已匯入訓練！'), false);
+                setTimeout(() => {
+                    if (showWorkoutModal) {
+                        showWorkoutModal(dayIndex);
+                    }
+                }, 1500);
+                return true;
+            } else {
+                updateGarminStatus(`驗證失敗：${data.error}`, true);
+                // Keep MFA session alive for retry with different code
+                return false;
+            }
+        } catch (error) {
+            clearPendingMfa();
+            hideOtpInput();
+            updateGarminStatus(`連線錯誤：${error.message}`, true);
+            return false;
+        }
+    }
+
+    // Step 1: Initial login
     if (!email || !password) {
         updateGarminStatus('請輸入 Email 和密碼', true);
         return false;
     }
 
-    if (mfaCode) {
-        updateGarminStatus('驗證中...', false);
-    } else {
-        updateGarminStatus('登入並匯入中...', false);
-    }
+    updateGarminStatus('登入並匯入中...', false);
 
-    // Save credentials
-    setGarminCredentials(email, password);
-
-    // Import with credentials
+    // Prepare workouts
     const training = trainingData[dayIndex];
     if (!training) {
         updateGarminStatus('找不到訓練資料', true);
@@ -269,34 +344,30 @@ export async function garminLoginAndSave(email, password, dayIndex, trainingData
     }));
 
     try {
-        const requestBody = {
-            email,
-            password,
-            workouts: workoutPayloads
-        };
-
-        // Add MFA code if provided
-        if (mfaCode) {
-            requestBody.mfaCode = mfaCode;
-        }
-
         const response = await fetch('/api/garmin/import', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify({
+                email,
+                password,
+                workouts: workoutPayloads
+            })
         });
 
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             updateGarminStatus('伺服器錯誤，請稍後再試', true);
-            clearGarminCredentials();
             return false;
         }
 
         const data = await response.json();
 
-        // Check if MFA is needed
+        // Check if MFA is needed - store session for step 2
         if (data.needsMfa) {
+            pendingMfaSession = data.mfaSession;
+            pendingWorkouts = workoutPayloads;
+            // Save credentials temporarily for after MFA
+            setGarminCredentials(email, password);
             updateGarminStatus(data.message || '請輸入 Email 收到的驗證碼', true);
             showOtpInput();
             return false;
@@ -310,7 +381,10 @@ export async function garminLoginAndSave(email, password, dayIndex, trainingData
         }
 
         if (data.success) {
+            // Save credentials on successful login
+            setGarminCredentials(email, password);
             hideOtpInput();
+            clearPendingMfa();
             updateGarminStatus('✅ ' + (data.message || '登入成功並已匯入訓練！'), false);
             setTimeout(() => {
                 if (showWorkoutModal) {
@@ -319,21 +393,17 @@ export async function garminLoginAndSave(email, password, dayIndex, trainingData
             }, 1500);
             return true;
         } else {
-            // Check if it's an MFA error
-            if (data.needsMfa || (data.error && data.error.includes('驗證碼'))) {
-                updateGarminStatus(data.message || data.error || '請輸入驗證碼', true);
-                showOtpInput();
-            } else {
-                clearGarminCredentials();
-                clearGarminUser();
-                hideOtpInput();
-                updateGarminStatus(`登入失敗：${data.error}`, true);
-            }
+            clearGarminCredentials();
+            clearGarminUser();
+            hideOtpInput();
+            clearPendingMfa();
+            updateGarminStatus(`登入失敗：${data.error}`, true);
             return false;
         }
     } catch (error) {
         clearGarminCredentials();
         hideOtpInput();
+        clearPendingMfa();
         updateGarminStatus(`連線錯誤：${error.message}`, true);
         return false;
     }
@@ -344,6 +414,7 @@ export function garminLogout(showWorkoutModal, dayIndex) {
     clearGarminToken();
     clearGarminUser();
     clearGarminCredentials();
+    clearPendingMfa();
     updateGarminStatus('已登出 Garmin Connect', false);
 
     setTimeout(() => {
